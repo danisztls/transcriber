@@ -70,7 +70,7 @@ def parse_html(html):
 """Generate file path from URL"""
 def gen_path(url):
     # parse url
-    tree = re.match("http[s]://(.*)", url).group(1).split('/')
+    tree = re.match("https?://(.*)", url).group(1).split('/')
     dir = tree[0]
 
     # gen uuid if no path 
