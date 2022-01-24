@@ -12,7 +12,7 @@ import argparse, re, uuid, os, pathlib, time
 import urllib3
 # https://urllib3.readthedocs.io/en/stable/
 
-from markdownify import markdownify as md
+from markdownify import MarkdownConverter
 # https://github.com/matthewwithanm/python-markdownify/
 
 from bs4 import BeautifulSoup
@@ -41,7 +41,6 @@ args = parser.parse_args()
 http = urllib3.PoolManager()
 def get_html(url):
     # TODO: Use a custom request header
-    # TODO: Return BeautifulSoup objetc (update from upstream)
     response = http.request("GET", url)
     if response.status == 200:
         html = BeautifulSoup(response.data, 'html.parser')
@@ -52,11 +51,12 @@ def get_html(url):
             if article:
                 break
             
-        return str(article) 
+        return article 
+
 
 """Parse HTML into Markdown"""
 def parse_html(html):
-    content = md(html)
+    content = MarkdownConverter().convert_soup(html)
     content = content.strip() # remove leading and trailing lines
     # content = re.sub('\s+\n', '\n', content) # remove whitespace from empty lines
     return content
