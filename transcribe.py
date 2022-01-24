@@ -41,8 +41,10 @@ args = parser.parse_args()
 http = urllib3.PoolManager()
 def get_html(url):
     # TODO: Use a custom request header
-    response = http.request("GET", url)
-    if response.status == 200:
+    
+    try:
+        response = http.request("GET", url)
+
         html = BeautifulSoup(response.data, 'html.parser')
         html(html.prettify())
 
@@ -50,9 +52,13 @@ def get_html(url):
             article = html.find(tag)
             if article:
                 break
-            
-        return article 
 
+    except Exception as e:
+        bucket = "<strong>Bad boy, no page for you.</strong>"
+        bucket += f"\n<p>{e}</p>"
+        article = BeautifulSoup(bucket, "html.parser")
+    
+    return article 
 
 """Parse HTML into Markdown"""
 def parse_html(html):
@@ -100,7 +106,6 @@ class chronometer:
 """Scrape URL and save content to disk as Markdown"""
 @chronometer()
 def scrape(url):
-    # TODO: Scrape images and rewrite URL 
     print(f"\n{url}")
 
     html = get_html(url)
@@ -115,7 +120,7 @@ def scrape(url):
             save_file(url, content)
 
 if args.target:
-      print("Scraping URL...\n")
+      print("Scraping URL...")
       scrape(args.target)
 
 if args.list: 
@@ -123,7 +128,7 @@ if args.list:
         urls = yaml.safe_load(file)
 
     for url in urls:
-      print("Scraping list of URLs...\n")
+      print("Scraping list of URLs...")
       scrape(url)
 
 if not args.target and not args.list:
