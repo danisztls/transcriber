@@ -62,7 +62,7 @@ def get_html(url):
 
 """Parse HTML into Markdown"""
 def parse_html(html):
-    content = MarkdownConverter().convert_soup(html)
+    content = MarkdownConverter(heading_style="ATX", newline_style="backslash").convert_soup(html)
     content = content.strip() # remove leading and trailing lines
     # content = re.sub('\s+\n', '\n', content) # remove whitespace from empty lines
     return content
