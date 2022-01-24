@@ -71,12 +71,19 @@ def parse_html(html):
 def gen_path(url):
     # parse url
     tree = re.match("https?://(.*)", url).group(1).split('/')
+    
+    # remove trailing slash
+    if tree[-1] == '':
+        tree.pop()
+
+    # construct path
     dir = tree[0]
 
-    # gen uuid if no path 
     if len(tree) > 0:
         file = tree[-1]
         file = re.sub("\..*", "", file) # remove extension
+
+    # gen uuid if no name 
     else:
         file = str(uuid.uuid4())
     
