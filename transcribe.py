@@ -104,10 +104,13 @@ def gen_path(url):
 
 """Save content to disk"""
 def save_file(path, data):
-    # TODO: Check if file does not already exist
-    with open(path, 'w') as file:
-        print(data, file=file)
-        
+    if not os.path.exists(path):
+        with open(path, 'w') as file:
+            print(data, file=file)
+    
+    else:
+        print(f"{path} already exists! Ignoring...")
+
 """Measure execution time of function"""
 class chronometer:
     def __call__(self, func):
