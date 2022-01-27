@@ -37,6 +37,8 @@ parser.add_argument('-n', '--dry-run', dest='dry_run', default=False, help="dry 
 parser.add_argument('-v', '--verbose', dest='verbose', default=False, help="verbose mode (print to stdout)", action="store_true")
 args = parser.parse_args()
 
+# TODO: Modify dry-run and verbose as to make more sense
+
 """Make a GET request and return HTML excerpt"""
 http = urllib3.PoolManager()
 def get_html(url):
@@ -87,17 +89,19 @@ def gen_path(url):
     else:
         file = str(uuid.uuid4())
     
-    dir_path = outdir + '/' + dir
-    gen_dir(dir_path)
+    dir = outdir + '/' + dir + '/'
+    gen_dir(dir)
 
-    file_path = dir_path + '/' + file + '.md' 
-    return file_path
+    file = file + '.md' 
+    
+    return [dir, file]
 
 """Save content to disk"""
-def save_file(url, content):
-    with open(gen_path(url), 'w') as file:
-        print(content, file=file)
-
+def save_file(path, data):
+    # TODO: Check if file does not already exist
+    with open(path, 'w') as file:
+        print(data, file=file)
+        
 """Measure execution time of function"""
 class chronometer:
     def __call__(self, func):
@@ -114,29 +118,30 @@ class chronometer:
 @chronometer()
 def scrape(url):
     print(f"\n{url}")
-
+    path = gen_path(url)
     html = get_html(url)
+    content = parse_html(html)
+    
+    if args.verbose == True:
+        print(content)
 
-    if html:
-        content = parse_html(html)
+    if args.dry_run == False:
+        save_file(path[0] + path[1], content)
 
-        if args.verbose == True:
-            print(content)
+def main():
+    if args.target:
+          print("Scraping URL...")
+          scrape(args.target)
 
-        if args.dry_run == False:
-            save_file(url, content)
+    if args.list: 
+        with open(args.list, 'r') as file:
+            urls = yaml.safe_load(file)
 
-if args.target:
-      print("Scraping URL...")
-      scrape(args.target)
+        for url in urls:
+          print("Scraping list of URLs...")
+          scrape(url)
 
-if args.list: 
-    with open(args.list, 'r') as file:
-        urls = yaml.safe_load(file)
+    if not args.target and not args.list:
+        print("No URL to scrape. Please input an URL or Yaml list.")
 
-    for url in urls:
-      print("Scraping list of URLs...")
-      scrape(url)
-
-if not args.target and not args.list:
-    print("No URL to scrape. Please input an URL or Yaml list.")
+main()
