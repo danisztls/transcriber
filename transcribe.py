@@ -21,13 +21,9 @@ from bs4 import BeautifulSoup
 import yaml
 # https://github.com/yaml/pyyaml
 
-# generate output dir
-def mkdir(dir):
-    if not os.path.exists(dir):
-        os.mkdir(dir)
-
-outdir = str(pathlib.Path().absolute()) + '/out'
-mkdir(outdir)
+# TODO: Make this an argument
+# TODO: Strip and readd '/' to avoid confusions
+root_path = str(pathlib.Path().absolute()) + '/out'
 
 # parse arguments
 parser = argparse.ArgumentParser()
@@ -38,6 +34,16 @@ parser.add_argument('-v', '--verbose', dest='verbose', default=False, help="verb
 args = parser.parse_args()
 
 # TODO: Modify dry-run and verbose as to make more sense
+
+"""Traverse a path and create nonexistent dirs"""
+def mkdir(path):
+    dirs = path.strip('/').split('/')
+    path = ''
+
+    for dir in dirs:
+        path += '/' + dir 
+        if not os.path.exists(path):
+            os.mkdir(path)
 
 """Make a GET request and return HTML excerpt"""
 http = urllib3.PoolManager()
@@ -79,7 +85,7 @@ def gen_path(url):
         tree.pop()
 
     # construct path
-    dir = tree[0]
+    path = tree[0]
 
     if len(tree) > 0:
         file = tree[-1]
@@ -89,12 +95,12 @@ def gen_path(url):
     else:
         file = str(uuid.uuid4())
     
-    dir = outdir + '/' + dir + '/'
-    mkdir(dir)
+    path = root_path + '/' + path + '/'
+    mkdir(path)
 
     file = file + '.md' 
     
-    return [dir, file]
+    return [path, file]
 
 """Save content to disk"""
 def save_file(path, data):
