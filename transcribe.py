@@ -35,6 +35,8 @@ args = parser.parse_args()
 
 # TODO: Modify dry-run and verbose as to make more sense
 
+http = urllib3.PoolManager()
+
 """Traverse a path and create nonexistent dirs"""
 def mkdir(path):
     dirs = path.strip('/').split('/')
@@ -46,7 +48,6 @@ def mkdir(path):
             os.mkdir(path)
 
 """Make a GET request and return HTML excerpt"""
-http = urllib3.PoolManager()
 def get_html(url):
     # TODO: Use a custom request header
     
@@ -67,6 +68,17 @@ def get_html(url):
         article = BeautifulSoup(bucket, "html.parser")
     
     return article 
+
+"""Make a GET request and return file data"""
+def get_file(url):
+    try:
+        response = http.request("GET", url)
+        data = response.data
+
+    except Exception as e:
+        data = None
+    
+    return data 
 
 """Parse HTML into Markdown"""
 def parse_html(html):
