@@ -22,12 +22,12 @@ import yaml
 # https://github.com/yaml/pyyaml
 
 # generate output dir
-def gen_dir(dir):
+def mkdir(dir):
     if not os.path.exists(dir):
         os.mkdir(dir)
 
 outdir = str(pathlib.Path().absolute()) + '/out'
-gen_dir(outdir)
+mkdir(outdir)
 
 # parse arguments
 parser = argparse.ArgumentParser()
@@ -90,7 +90,7 @@ def gen_path(url):
         file = str(uuid.uuid4())
     
     dir = outdir + '/' + dir + '/'
-    gen_dir(dir)
+    mkdir(dir)
 
     file = file + '.md' 
     
