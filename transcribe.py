@@ -122,16 +122,16 @@ def save_file(path, data):
 """Download assets referenced in the content and rewrite URLs to point to local files"""
 def get_assets(path, content):
     # find in content all URLs that ends with a extension
-    urls = re.findall("\((http.*?\.\w*)\)", content)
+    assets = re.findall("\((http.*?\.\w*)\)", content)
     
     # pop what's not an HTML page
     is_html = re.compile("^.*\.(html|htm)$")
-    for url in enumerate(urls):
+    for url in enumerate(assets):
         if is_html.match(url[1]):
-            urls.pop(url[0])
+            assets.pop(url[0])
 
     # get assets
-    for url in urls:
+    for url in assets:
         data = get_file(url)
         file = re.match("^.*\/(.*?)$", url).group(1)
 
