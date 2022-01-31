@@ -169,16 +169,15 @@ def scrape(url):
         save_file(path[0] + path[1], content)
 
 def main():
+    print("Scraping...")
     if args.target:
-          print("Scraping URL...")
-          scrape(args.target)
+        scrape(args.target)
 
     if args.list: 
         with open(args.list, 'r') as file:
             urls = yaml.safe_load(file)
 
         for url in urls:
-          print("Scraping list of URLs...")
           scrape(url)
 
     if not args.target and not args.list:
