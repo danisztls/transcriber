@@ -127,7 +127,7 @@ def save_file(path, data):
 """Download assets referenced in the content and rewrite URLs to point to local files"""
 def get_assets(path, content):
     # find in content all URLs that ends with a extension
-    assets = re.findall("\((http.*?\.jpg|JPG|jpeg|JPEG|webp|WEBP|pdf|PDF)\)", content)
+    assets = re.findall("\((http.*?\.jpg|JPG|jpeg|JPEG|png|PNG|webp|WEBP|avif|AVIF|pdf|PDF)\)", content)
     
     # pop what's not an HTML page
     # is_html = re.compile("^.*\.(html|htm)$")
