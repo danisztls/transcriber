@@ -123,6 +123,28 @@ def save_file(path, data):
     else:
         print(f"{path} already exists! Ignoring...")
 
+"""Download assets referenced in the content and rewrite URLs to point to local files"""
+def get_assets(path, content):
+    # find in content all URLs that ends with a extension
+    urls = re.findall("\((http.*?\.\w*)\)", content)
+    
+    # pop what's not an HTML page
+    is_html = re.compile("^.*\.(html|htm)$")
+    for url in enumerate(urls):
+        if is_html.match(url[1]):
+            urls.pop(url[0])
+
+    # get assets
+    for url in urls:
+        data = get_file(url)
+        file = re.match("^.*\/(.*?)$", url).group(1)
+
+        if data:
+            save_file(path + file, data)
+            content = content.replace(url, '../' + file)
+            
+    return content
+
 """Measure execution time of function"""
 class chronometer:
     def __call__(self, func):
@@ -147,6 +169,7 @@ def scrape(url):
         print(content)
 
     if args.dry_run == False:
+        content = get_assets(path[0], content)
         save_file(path[0] + path[1], content)
 
 def main():
