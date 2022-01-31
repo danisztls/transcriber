@@ -21,10 +21,6 @@ from bs4 import BeautifulSoup
 import yaml
 # https://github.com/yaml/pyyaml
 
-# TODO: Make this an argument
-# TODO: Strip and readd '/' to avoid confusions
-root_path = str(pathlib.Path().absolute()) + '/out'
-
 # parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('-t', '--target', dest='target', help="URL to scrap")
@@ -33,7 +29,7 @@ parser.add_argument('-n', '--dry-run', dest='dry_run', default=False, help="dry 
 parser.add_argument('-v', '--verbose', dest='verbose', default=False, help="verbose mode (print to stdout)", action="store_true")
 args = parser.parse_args()
 
-# TODO: Modify dry-run and verbose as to make more sense
+output_path = str(pathlib.Path().absolute()) + '/out'
 
 http = urllib3.PoolManager()
 
@@ -101,15 +97,15 @@ def gen_path(url):
 
     if len(tree) > 0:
         file = tree[-1]
-        file = re.sub("\..*", "", file) # remove extension
 
     # gen uuid if no name 
     else:
         file = str(uuid.uuid4())
     
-    path = root_path + '/' + path + '/'
+    path = output_path + '/' + path + '/'
     mkdir(path)
 
+    file = re.sub("\..*", "", file) # remove extension
     file = file + '.md' 
     
     return [path, file]
