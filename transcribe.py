@@ -21,6 +21,10 @@ from bs4 import BeautifulSoup
 import yaml
 # https://github.com/yaml/pyyaml
 
+from rich import print
+# https://github.com/Textualize/rich
+# https://github.com/Textualize/rich/blob/master/rich/_emoji_codes.py
+
 # parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('-t', '--target', dest='target', help="URL to scrap")
@@ -117,7 +121,8 @@ def save_file(path, data):
             print(data, file=file)
     
     else:
-        print(f"{path} already exists! Ignoring...")
+        if args.verbose == True:
+            print(f"[gray]{path}[/gray] [yellow]already exists![/yellow]")
 
 """Download assets referenced in the content and rewrite URLs to point to local files"""
 def get_assets(path, content):
@@ -125,13 +130,14 @@ def get_assets(path, content):
     assets = re.findall("\((http.*?\.jpg|JPG|jpeg|JPEG|webp|WEBP|pdf|PDF)\)", content)
     
     # pop what's not an HTML page
-    is_html = re.compile("^.*\.(html|htm)$")
-    for url in enumerate(assets):
-        if is_html.match(url[1]):
-            assets.pop(url[0])
+    # is_html = re.compile("^.*\.(html|htm)$")
+    # for url in enumerate(assets):
+    #     if is_html.match(url[1]):
+    #         assets.pop(url[0])
 
     # get assets
     for url in assets:
+        print(f"\n:paperclip: [gray]{url}[/gray]")
         data = get_file(url)
         file = re.match("^.*\/(.*?)$", url).group(1)
 
@@ -148,7 +154,7 @@ class chronometer:
             start = time.time()
             result = func(*args, **kwargs)
             end = time.time()
-            print("%s seconds" % str(round(end - start, 2)))
+            print("[green]%s seconds[/green]" % str(round(end - start, 2)))
             
             return result
         return wrapper
@@ -156,7 +162,7 @@ class chronometer:
 """Scrape URL and save content to disk as Markdown"""
 @chronometer()
 def scrape(url):
-    print(f"\n{url}")
+    print(f"\n:page_facing_up: [purple]{url}[/purple]")
     path = gen_path(url)
     html = get_html(url)
     content = parse_html(html)
@@ -169,7 +175,7 @@ def scrape(url):
         save_file(path[0] + path[1], content)
 
 def main():
-    print("Scraping...")
+    print(":spider: scraping...")
     if args.target:
         scrape(args.target)
 
@@ -181,6 +187,6 @@ def main():
           scrape(url)
 
     if not args.target and not args.list:
-        print("No URL to scrape. Please input an URL or Yaml list.")
+        print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")
 
 main()
