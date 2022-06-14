@@ -86,7 +86,7 @@ def get_file(url):
     
     return data 
 
-"""Filter HTML to remove undesired artifacts like JS and custom style"""
+"""Filter HTML to remove non-content"""
 def filter_html(html):
     tags = [html.style, html.script, html.iframe]
 
@@ -102,9 +102,16 @@ def filter_html(html):
 
 """Parse HTML into Markdown"""
 def parse_html(html):
-    mkdown = MarkdownConverter(heading_style="ATX", newline_style="backslash").convert_soup(html)
+    return MarkdownConverter(heading_style="ATX", newline_style="backslash").convert_soup(html)
+
+"""Filter Markdown to remove undesirables"""
+def filter_mkdown(mkdown):
     mkdown = mkdown.strip() # remove leading and trailing lines
     # mkdown = re.sub('\s+\n', '\n', mkdown) # remove whitespace from empty lines
+    
+    # remove link obfuscators
+    mkdown = re.sub("https://www.google.com/url\?q=", "", mkdown)
+
     return mkdown
 
 """Generate file path from URL"""
@@ -187,6 +194,7 @@ def scrape(url):
     html = get_html(url)
     html = filter_html(html)
     mkdown = parse_html(html)
+    mkdown = filter_mkdown(mkdown)
     
     if args.verbose == True:
         print(mkdown)
