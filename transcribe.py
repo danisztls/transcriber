@@ -49,37 +49,31 @@ def mkdir(path):
 
 """Make a GET request and return HTML excerpt"""
 def get_html(url):
-    
-    if re.match("https?://.*", url):
-        try:
+    try:
+        if re.match("https?://.*", url):
             # TODO: Use a custom request header
             response = http.request("GET", url)
             html = BeautifulSoup(response.data, 'html.parser')
 
-        except Exception as e:
-            html = None
+        elif re.match("file://.*", url): 
+            path = re.sub("^file://", "", url)
 
-    elif re.match("file://.*", url): 
-        path = re.sub("^file://", "", url)
+            with open(path, 'r') as file:
+                data = file.read()
+                html = BeautifulSoup(data, 'html.parser')
+            
+    except Exception as error:
+        print(f"[red]ERROR:[/red] {error}")
+        data = "<strong>Bad boy, no page for you.</strong>"
+        data += f"\n<p>{error}</p>"
+        return BeautifulSoup(data, "html.parser")
 
-        with open(path, 'r') as file:
-            data = file.read()
-            html = BeautifulSoup(data, 'html.parser')
+    html(html.prettify())
 
-    if html:
-        html(html.prettify())
-
-        for tag in ['article', 'main', 'body']:
-            article = html.find(tag)
-            if article:
-                break
-
-    else:
-        bucket = "<strong>Bad boy, no page for you.</strong>"
-        bucket += f"\n<p>{e}</p>"
-        article = BeautifulSoup(bucket, "html.parser")
-    
-    return article 
+    for tag in ['article', 'main', 'body']:
+        article = html.find(tag)
+        if article:
+            return article 
 
 """Make a GET request and return file data"""
 def get_file(url):
