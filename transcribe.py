@@ -38,14 +38,14 @@ output_path = str(pathlib.Path().absolute()) + '/out'
 http = urllib3.PoolManager()
 
 """Traverse a path and create nonexistent dirs"""
-def mkdownir(path):
+def mkdir(path):
     dirs = path.strip('/').split('/')
     path = ''
 
     for dir in dirs:
         path += '/' + dir 
         if not os.path.exists(path):
-            os.mkdownir(path)
+            os.mkdir(path)
 
 """Make a GET request and return HTML excerpt"""
 def get_html(url):
@@ -127,7 +127,7 @@ def gen_path(url):
         path = "local/" + tree[-2]
     
     path = output_path + '/' + path + '/'
-    mkdownir(path)
+    mkdir(path)
 
     file = re.sub("\..*", "", tree[-1]) + '.md' # substitute extension
 
