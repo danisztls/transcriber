@@ -108,9 +108,12 @@ def parse_html(html):
 def filter_mkdown(mkdown):
     mkdown = mkdown.strip() # remove leading and trailing lines
     # mkdown = re.sub('\s+\n', '\n', mkdown) # remove whitespace from empty lines
-    
+
+    # TODO: Make some filters modular
+
     # remove link obfuscators
-    mkdown = re.sub("https://www.google.com/url\?q=", "", mkdown)
+    google_pattern = re.compile(r"\(https://www.google.com/url\?q=(https?://.*?)&.*\)")
+    mkdown = re.sub(google_pattern, r"(\1)", mkdown)
 
     return mkdown
 
