@@ -49,12 +49,24 @@ def mkdir(path):
 
 """Make a GET request and return HTML excerpt"""
 def get_html(url):
-    # TODO: Use a custom request header
     
-    try:
-        response = http.request("GET", url)
+    if re.match("https?://.*", url):
+        try:
+            # TODO: Use a custom request header
+            response = http.request("GET", url)
+            html = BeautifulSoup(response.data, 'html.parser')
 
-        html = BeautifulSoup(response.data, 'html.parser')
+        except Exception as e:
+            html = None
+
+    elif re.match("file://.*", url): 
+        path = re.sub("^file://", "", url)
+
+        with open(path, 'r') as file:
+            data = file.read()
+            html = BeautifulSoup(data, 'html.parser')
+
+    if html:
         html(html.prettify())
 
         for tag in ['article', 'main', 'body']:
@@ -62,7 +74,7 @@ def get_html(url):
             if article:
                 break
 
-    except Exception as e:
+    else:
         bucket = "<strong>Bad boy, no page for you.</strong>"
         bucket += f"\n<p>{e}</p>"
         article = BeautifulSoup(bucket, "html.parser")
@@ -90,35 +102,35 @@ def parse_html(html):
 """Generate file path from URL"""
 def gen_path(url):
     # parse url
-    tree = re.match("https?://(.*)", url).group(1).split('/')
-    
-    # remove trailing slash
-    if tree[-1] == '':
-        tree.pop()
+    tree = re.match("(https?|file)://(.*)", url).group(2).split('/')
 
-    # construct path
-    path = tree[0]
+    # http(s)://
+    if re.match("https?://.*", url):
+        
+        # remove trailing slash
+        if tree[-1] == '':
+            tree.pop()
 
-    if len(tree) > 0:
+        # construct path
+        path = tree[0]
+
+    # file://
+    elif re.match("file://.*", url): 
+        path = "local/" + tree[-2]
         file = tree[-1]
-
-    # gen uuid if no name 
-    else:
-        file = str(uuid.uuid4())
     
     path = output_path + '/' + path + '/'
     mkdir(path)
 
-    file = re.sub("\..*", "", file) # remove extension
-    file = file + '.md' 
-    
+    file = re.sub("\..*", "", file) + '.md' # substitute extension
+
     return [path, file]
 
 """Save content to disk"""
 def save_file(path, data):
     if not os.path.exists(path):
         with open(path, 'w') as file:
-            print(data, file=file)
+            file.write(data)
     
     else:
         if args.verbose == True:
@@ -185,8 +197,8 @@ def main():
 
         for url in urls:
           scrape(url)
-
-    if not args.target and not args.list:
+   
+    if not args.target and not args.list and not args.file:
         print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")
 
 main()
