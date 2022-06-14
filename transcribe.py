@@ -134,8 +134,8 @@ def gen_path(url):
     return [path, file]
 
 """Save data to disk"""
-def save_file(path, data):
-    if not os.path.exists(path):
+def save_file(path, data, overwrite=False):
+    if not os.path.exists(path) or overwrite:
         with open(path, 'w') as file:
             file.write(data)
     
@@ -193,7 +193,7 @@ def scrape(url):
 
     if args.dry_run == False:
         mkdown = get_assets(path[0], mkdown)
-        save_file(path[0] + path[1], mkdown)
+        save_file(path[0] + path[1], mkdown, True)
 
 def main():
     print(":spider: scraping...")
