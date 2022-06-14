@@ -111,12 +111,11 @@ def gen_path(url):
     # file://
     elif re.match("file://.*", url): 
         path = "local/" + tree[-2]
-        file = tree[-1]
     
     path = output_path + '/' + path + '/'
     mkdir(path)
 
-    file = re.sub("\..*", "", file) + '.md' # substitute extension
+    file = re.sub("\..*", "", tree[-1]) + '.md' # substitute extension
 
     return [path, file]
 
