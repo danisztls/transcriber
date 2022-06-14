@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Scrape URL content to Markdown
+Scrape content at URL to Markdown
 """
 
 __author__  = "Daniel Souza <me@posix.dev.br>"
@@ -38,14 +38,14 @@ output_path = str(pathlib.Path().absolute()) + '/out'
 http = urllib3.PoolManager()
 
 """Traverse a path and create nonexistent dirs"""
-def mkdir(path):
+def mkdownir(path):
     dirs = path.strip('/').split('/')
     path = ''
 
     for dir in dirs:
         path += '/' + dir 
         if not os.path.exists(path):
-            os.mkdir(path)
+            os.mkdownir(path)
 
 """Make a GET request and return HTML excerpt"""
 def get_html(url):
@@ -87,7 +87,6 @@ def get_file(url):
     return data 
 
 """Filter HTML to remove undesired artifacts like JS and custom style"""
-# TODO: Improve performance
 def filter_html(html):
     tags = [html.style, html.script, html.iframe]
 
@@ -95,6 +94,7 @@ def filter_html(html):
         if tag:
             tag.decompose()
 
+    # TODO: Improve performance
     for tag in html.find_all():
         del tag['style']
 
@@ -102,10 +102,10 @@ def filter_html(html):
 
 """Parse HTML into Markdown"""
 def parse_html(html):
-    content = MarkdownConverter(heading_style="ATX", newline_style="backslash").convert_soup(html)
-    content = content.strip() # remove leading and trailing lines
-    # content = re.sub('\s+\n', '\n', content) # remove whitespace from empty lines
-    return content
+    mkdown = MarkdownConverter(heading_style="ATX", newline_style="backslash").convert_soup(html)
+    mkdown = mkdown.strip() # remove leading and trailing lines
+    # mkdown = re.sub('\s+\n', '\n', mkdown) # remove whitespace from empty lines
+    return mkdown
 
 """Generate file path from URL"""
 def gen_path(url):
@@ -127,13 +127,13 @@ def gen_path(url):
         path = "local/" + tree[-2]
     
     path = output_path + '/' + path + '/'
-    mkdir(path)
+    mkdownir(path)
 
     file = re.sub("\..*", "", tree[-1]) + '.md' # substitute extension
 
     return [path, file]
 
-"""Save content to disk"""
+"""Save data to disk"""
 def save_file(path, data):
     if not os.path.exists(path):
         with open(path, 'w') as file:
@@ -143,10 +143,11 @@ def save_file(path, data):
         if args.verbose == True:
             print(f"[gray]{path}[/gray] [yellow]already exists![/yellow]")
 
-"""Download assets referenced in the content and rewrite URLs to point to local files"""
-def get_assets(path, content):
+"""Download assets referenced in the Markdown content and rewrite URLs to point to local files"""
+def get_assets(path, mkdown):
     # find in content all URLs that ends with a extension
-    assets = re.findall("\((http.*?\.jpg|JPG|jpeg|JPEG|png|PNG|webp|WEBP|avif|AVIF|pdf|PDF)\)", content)
+    # TODO: Improve this
+    assets = re.findall("\((http.*?\.jpg|JPG|jpeg|JPEG|png|PNG|webp|WEBP|avif|AVIF|pdf|PDF)\)", mkdown)
     
     # pop what's not an HTML page
     # is_html = re.compile("^.*\.(html|htm)$")
@@ -162,9 +163,9 @@ def get_assets(path, content):
 
         if data:
             save_file(path + file, data)
-            content = content.replace(url, '../' + file)
+            mkdown = mkdown.replace(url, '../' + file)
             
-    return content
+    return mkdown
 
 """Measure execution time of function"""
 class chronometer:
@@ -178,22 +179,21 @@ class chronometer:
             return result
         return wrapper
 
-"""Scrape URL and save content to disk as Markdown"""
+"""Scrape URL and save Makdown content to disk"""
 @chronometer()
 def scrape(url):
     print(f"\n:page_facing_up: [purple]{url}[/purple]")
     path = gen_path(url)
     html = get_html(url)
     html = filter_html(html)
-    content = parse_html(html)
-    # content = filter_content(html)
+    mkdown = parse_html(html)
     
     if args.verbose == True:
-        print(content)
+        print(mkdown)
 
     if args.dry_run == False:
-        content = get_assets(path[0], content)
-        save_file(path[0] + path[1], content)
+        mkdown = get_assets(path[0], mkdown)
+        save_file(path[0] + path[1], mkdown)
 
 def main():
     print(":spider: scraping...")
