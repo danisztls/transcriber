@@ -86,6 +86,20 @@ def get_file(url):
     
     return data 
 
+"""Filter HTML to remove undesired artifacts like JS and custom style"""
+# TODO: Improve performance
+def filter_html(html):
+    tags = [html.style, html.script, html.iframe]
+
+    for tag in tags:
+        if tag:
+            tag.decompose()
+
+    for tag in html.find_all():
+        del tag['style']
+
+    return html
+
 """Parse HTML into Markdown"""
 def parse_html(html):
     content = MarkdownConverter(heading_style="ATX", newline_style="backslash").convert_soup(html)
@@ -170,7 +184,9 @@ def scrape(url):
     print(f"\n:page_facing_up: [purple]{url}[/purple]")
     path = gen_path(url)
     html = get_html(url)
+    html = filter_html(html)
     content = parse_html(html)
+    # content = filter_content(html)
     
     if args.verbose == True:
         print(content)
