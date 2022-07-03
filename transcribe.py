@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Scrape content at URL to Markdown
+Scrape Web content into markdown
 """
 
 __author__  = "Daniel Souza <me@posix.dev.br>"

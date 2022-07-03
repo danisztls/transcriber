@@ -1,5 +1,5 @@
 # Transcriber
-Scrape content at an URL and save it as Markdown.
+Scrape Web content into markdown. 
 
 ## Cases 
 - making notes
