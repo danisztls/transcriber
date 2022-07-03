@@ -31,6 +31,7 @@ parser.add_argument('-t', '--target', dest='target', help="URL to scrap")
 parser.add_argument('-l', '--list', dest='list', help="YAML list of URLs to scrap")
 parser.add_argument('-n', '--dry-run', dest='dry_run', default=False, help="dry run mode (don't save)", action="store_true")
 parser.add_argument('-v', '--verbose', dest='verbose', default=False, help="verbose mode (print to stdout)", action="store_true")
+parser.add_argument('-d', '--debug', dest='debug', default=False, help="debug mode", action="store_true")
 args = parser.parse_args()
 
 output_path = str(pathlib.Path().absolute()) + '/out'
@@ -66,14 +67,22 @@ def get_html(url):
         print(f"[red]ERROR:[/red] {error}")
         data = "<strong>Bad boy, no page for you.</strong>"
         data += f"\n<p>{error}</p>"
+
+        if args.debug == True:
+            print("\n[deep_pink3]DEBUG: Failed to get HTML[/deep_pink3]\n")
+
         return BeautifulSoup(data, "html.parser")
 
     html(html.prettify())
 
     for tag in ['article', 'main', 'body']:
-        article = html.find(tag)
-        if article:
-            return article 
+        content = html.find(tag)
+        if content:
+            if args.debug == True:
+                print("\n[deep_pink3]DEBUG: Printing HTML content[/deep_pink3]\n")
+                print(content)
+
+            return content
 
 """Make a GET request and return file data"""
 def get_file(url):
@@ -102,7 +111,14 @@ def filter_html(html):
 
 """Parse HTML into Markdown"""
 def parse_html(html):
-    return MarkdownConverter(heading_style="ATX", newline_style="backslash").convert_soup(html)
+    mkd = MarkdownConverter(heading_style="ATX", newline_style="backslash").convert_soup(html)
+
+    if args.debug == True:
+        print("\n[deep_pink3]DEBUG: Printing Markdown[/deep_pink3]\n")
+        print(mkd)
+
+    return mkd
+
 
 """Filter Markdown to remove undesirables"""
 def filter_mkdown(mkdown):
@@ -150,12 +166,14 @@ def save_file(path, data, overwrite=False):
             file.write(data)
     
     else:
-        if args.verbose == True:
-            print(f"[gray]{path}[/gray] [yellow]already exists![/yellow]")
+        print(f"[gray]{path}[/gray] [yellow]already exists![/yellow]")
 
 """Download assets referenced in the Markdown content and rewrite URLs to point to local files"""
 def get_assets(path, mkdown):
     # find in content all URLs that ends with a extension
+
+    # TODO: Add support for fetching local files?
+
     # TODO: Improve this
     assets = re.findall("\((http.*?\.jpg|JPG|jpeg|JPEG|png|PNG|webp|WEBP|avif|AVIF|pdf|PDF)\)", mkdown)
     
