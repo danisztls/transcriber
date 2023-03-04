@@ -22,3 +22,6 @@ transcribe -v <URL>
 # Dry run, do not save to disk
 transcribe -n <URL>
 ```
+
+## See also
+- [autoscraper](https://github.com/alirezamika/autoscraper)
