@@ -236,5 +236,5 @@ def main():
         for url in urls:
           scrape(url)
    
-    if not args.target and not args.list and not args.file:
+    if not args.target and not args.list:
         print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")
