@@ -23,11 +23,11 @@ transcribe -t https://en.wikipedia.org/wiki/Transcription
 # Scrape a list of URLS
 transcribe -l urls.yml
 
-# Verbose, print to STDOUT
+# Verbose, print content to STDOUT
 transcribe -v -t <URL>
 
-# Dry run, do not save to disk
-transcribe -n -t <URL>
+# CLI mode, only print content to STDOUT
+transcribe -c -t <URL>
 ```
 
 ## See also

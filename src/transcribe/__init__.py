@@ -29,10 +29,14 @@ from rich import print
 parser = argparse.ArgumentParser()
 parser.add_argument('-t', '--target', dest='target', help="URL to scrap")
 parser.add_argument('-l', '--list', dest='list', help="YAML list of URLs to scrap")
-parser.add_argument('-n', '--dry-run', dest='dry_run', default=False, help="dry run mode (don't save)", action="store_true")
-parser.add_argument('-v', '--verbose', dest='verbose', default=False, help="verbose mode (print to stdout)", action="store_true")
+parser.add_argument('-c', '--cli-mode', dest='cli', default=False, help="CLI mode (only print content to STDOUT)", action="store_true")
+parser.add_argument('-v', '--verbose', dest='verbose', default=False, help="verbose mode (print content to STDOUT)", action="store_true")
 parser.add_argument('-d', '--debug', dest='debug', default=False, help="debug mode", action="store_true")
 args = parser.parse_args()
+
+CLI_MODE = args.cli
+VERBOSE_MODE = args.verbose
+DEBUG_MODE = args.debug
 
 output_path = str(pathlib.Path().absolute()) + '/output'
 
@@ -68,7 +72,7 @@ def get_html(url):
         data = "<strong>Bad boy, no page for you.</strong>"
         data += f"\n<p>{error}</p>"
 
-        if args.debug == True:
+        if DEBUG_MODE == True:
             print("\n[deep_pink3]DEBUG: Failed to get HTML[/deep_pink3]\n")
 
         return BeautifulSoup(data, "html.parser")
@@ -78,7 +82,7 @@ def get_html(url):
     for tag in ['article', 'main', 'body']:
         content = html.find(tag)
         if content:
-            if args.debug == True:
+            if DEBUG_MODE == True:
                 print("\n[deep_pink3]DEBUG: Printing HTML content[/deep_pink3]\n")
                 print(content)
 
@@ -113,7 +117,7 @@ def filter_html(html):
 def parse_html(html):
     mkd = MarkdownConverter(heading_style="ATX", newline_style="backslash").convert_soup(html)
 
-    if args.debug == True:
+    if DEBUG_MODE == True:
         print("\n[deep_pink3]DEBUG: Printing Markdown[/deep_pink3]\n")
         print(mkd)
 
@@ -185,7 +189,8 @@ def get_assets(path, mkdown):
 
     # get assets
     for url in assets:
-        print(f"\n:paperclip: [gray]{url}[/gray]")
+        if CLI_MODE == False:
+            print(f"\n:paperclip: [gray]{url}[/gray]")
         data = get_file(url)
         file = re.match("^.*\/(.*?)$", url).group(1)
 
@@ -202,7 +207,9 @@ class chronometer:
             start = time.time()
             result = func(*args, **kwargs)
             end = time.time()
-            print("[green]%s seconds[/green]" % str(round(end - start, 2)))
+
+            if CLI_MODE == False:
+                print("[green]%s seconds[/green]" % str(round(end - start, 2)))
             
             return result
         return wrapper
@@ -210,22 +217,25 @@ class chronometer:
 """Scrape URL and save Makdown content to disk"""
 @chronometer()
 def scrape(url):
-    print(f"\n:page_facing_up: [purple]{url}[/purple]")
+    if CLI_MODE == False:
+        print(f"\n:page_facing_up: [purple]{url}[/purple]")
     path = gen_path(url)
     html = get_html(url)
     html = filter_html(html)
     mkdown = parse_html(html)
     mkdown = filter_mkdown(mkdown)
     
-    if args.verbose == True:
+    if VERBOSE_MODE == True or CLI_MODE == True:
         print(mkdown)
 
-    if args.dry_run == False:
+    if CLI_MODE == False:
         mkdown = get_assets(path[0], mkdown)
         save_file(path[0] + path[1], mkdown, True)
 
 def main():
-    print(":spider: scraping...")
+    if CLI_MODE == False:
+        print(":spider: scraping...")
+
     if args.target:
         scrape(args.target)
 
