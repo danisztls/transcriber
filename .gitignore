@@ -1,3 +1,5 @@
-# Artifacts
-out/
+output/
 urls.yml
+
+# Python
+__pycache__

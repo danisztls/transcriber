@@ -34,7 +34,7 @@ parser.add_argument('-v', '--verbose', dest='verbose', default=False, help="verb
 parser.add_argument('-d', '--debug', dest='debug', default=False, help="debug mode", action="store_true")
 args = parser.parse_args()
 
-output_path = str(pathlib.Path().absolute()) + '/out'
+output_path = str(pathlib.Path().absolute()) + '/output'
 
 http = urllib3.PoolManager()
 
@@ -238,5 +238,3 @@ def main():
    
     if not args.target and not args.list and not args.file:
         print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")
-
-main()

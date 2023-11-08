@@ -4,6 +4,9 @@ version = "0.1.0"
 description = ""
 authors = ["Daniel Souza <me@posix.dev.br>"]
 readme = "README.md"
+packages = [
+  { include = "transcribe", from = "src" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -13,7 +16,9 @@ beautifulsoup4 = "^4.11.1"
 PyYAML = "^6.0"
 rich = "^13.3.1"
 
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+transcribe = "transcribe:main"
