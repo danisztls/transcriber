@@ -89,7 +89,7 @@ def get_html(url, path):
                 content.footer.decompose()
 
             if DEBUG_MODE == True:
-                save_file(path[0] + path[1] + '.content.html', html.prettify(), True)
+                save_file(path[0] + path[1] + '.content.html', content.prettify(), True)
 
             return content
 
