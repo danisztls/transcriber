@@ -51,9 +51,9 @@ def mkdir(path):
             os.mkdir(path)
 
 """Make a GET request and return HTML excerpt"""
-def get_html(url):
+def get_html(url, path):
     http = urllib3.PoolManager()
-    # mimic google crawler, poor man's way of bypassing paywalls
+    # mimic google crawler to bypass paywalls
     headers = urllib3.make_headers(user_agent="Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")
     try:
         if re.match(r"https?://.*", url):
@@ -76,13 +76,20 @@ def get_html(url):
         data += f"\n<p>{error}</p>"
         return BeautifulSoup(data, "html.parser")
 
+    if DEBUG_MODE == True:
+        save_file(path[0] + path[1] + '.raw.html', html.prettify(), True)
+
+    # get content via tag
     tags_to_search = ['article', 'main', 'body']
     for tag in tags_to_search:
         content = html.find(tag)
         if content:
-            return content
-    return html
+            if DEBUG_MODE == True:
+                save_file(path[0] + path[1] + '.content.html', html.prettify(), True)
 
+            return content
+
+    return html
 
 """Make a GET request and return file data"""
 def get_file(url):
@@ -96,7 +103,7 @@ def get_file(url):
     return data 
 
 """Filter HTML to remove non-content"""
-def filter_html(html):
+def filter_html(html, path):
     tags = [html.style, html.script, html.iframe]
 
     for tag in tags:
@@ -106,6 +113,9 @@ def filter_html(html):
     # TODO: Improve performance
     for tag in html.find_all():
         del tag['style']
+
+    if DEBUG_MODE == True:
+        save_file(path[0] + path[1] + '.filtered.html', html.prettify(), True)
 
     return html
 
@@ -209,21 +219,23 @@ def scrape(url):
     if CLI_MODE == False:
         print(f"\n:page_facing_up: [purple]{url}[/purple]")
     path = gen_path(url)
-    html = get_html(url)
+    html = get_html(url, path)
+    html = filter_html(html, path)
+    mkdown = parse_html(html)
 
     if DEBUG_MODE == True:
-        save_file(path[0] + path[1] + '.html', html.prettify(), True)
+        save_file(path[0] + path[1] + '.raw.md', mkdown, True)
 
-    html = filter_html(html)
-    mkdown = parse_html(html)
     mkdown = filter_mkdown(mkdown)
-    
+
+    if CLI_MODE == False:
+        mkdown = get_assets(path[0], mkdown)
+
+    if DEBUG_MODE == True or CLI_MODE == False:
+        save_file(path[0] + path[1] + '.md', mkdown, True)
+
     if VERBOSE_MODE == True or CLI_MODE == True:
         print(mkdown)
-
-    if CLI_MODE == False or DEBUG_MODE == True:
-        mkdown = get_assets(path[0], mkdown)
-        save_file(path[0] + path[1] + '.md', mkdown, True)
 
 def main():
     if CLI_MODE == False:
