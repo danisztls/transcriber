@@ -15,7 +15,7 @@ import urllib3
 from markdownify import MarkdownConverter
 # https://github.com/matthewwithanm/python-markdownify/
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 # https://beautiful-soup-4.readthedocs.io/en/latest/
 
 import yaml
@@ -104,14 +104,30 @@ def get_file(url):
 
 """Filter HTML to remove non-content"""
 def filter_html(html, path):
+    # remove tags by name
     removable_tags = ['style', 'script', 'iframe', 'nav', 'svg']
     for tag_name in removable_tags:
         for tag in html.find_all(tag_name):
             tag.decompose()
 
+    # filter tags
     for tag in html.find_all(True):
+        # remove style attrs
         if 'style' in tag.attrs:
             del tag['style']
+
+        # whitelist 
+        if tag.name == 'br' or tag.name == 'img' or tag.name == 'video' or tag.name == 'audio':
+            continue
+
+        # remove empty
+        if not tag.contents:
+            tag.decompose()
+
+    # remove comments
+    comments = html.findAll(text=lambda text: isinstance(text, Comment))
+    for comment in comments:
+        comment.extract()
 
     if DEBUG_MODE == True:
         save_file(path[0] + path[1] + '.filtered.html', html.prettify(), True)
