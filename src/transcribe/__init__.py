@@ -40,8 +40,6 @@ DEBUG_MODE = args.debug
 
 output_path = str(pathlib.Path().absolute()) + '/output'
 
-http = urllib3.PoolManager()
-
 """Traverse a path and create nonexistent dirs"""
 def mkdir(path):
     dirs = path.strip('/').split('/')
@@ -54,32 +52,39 @@ def mkdir(path):
 
 """Make a GET request and return HTML excerpt"""
 def get_html(url):
+    http = urllib3.PoolManager()
+    # mimic google crawler, poor man's way of bypassing paywalls
+    headers = urllib3.make_headers(user_agent="Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")
     try:
-        if re.match("https?://.*", url):
-            # TODO: Use a custom request header
-            response = http.request("GET", url)
+        if re.match(r"https?://.*", url):
+            response = http.request("GET", url, headers=headers)
+            if response.status != 200:
+                raise ValueError(f"HTTP Error: {response.status} for URL: {url}")
             html = BeautifulSoup(response.data, 'html.parser')
 
-        elif re.match("file://.*", url): 
-            path = re.sub("^file://", "", url)
+        elif re.match(r"file://.*", url): 
+            path = re.sub(r"^file://", "", url)
+            with open(path, 'r', encoding='utf-8') as file:
+                html = BeautifulSoup(file, 'html.parser')
+        else:
+            raise ValueError("URL must start with http://, https://, or file://")
 
-            with open(path, 'r') as file:
-                data = file.read()
-                html = BeautifulSoup(data, 'html.parser')
-            
     except Exception as error:
         print(f"[red]ERROR:[/red] {error}")
-        data = "<strong>Bad boy, no page for you.</strong>"
-        data += f"\n<p>{error}</p>"
 
         if DEBUG_MODE == True:
             print("\n[deep_pink3]DEBUG: Failed to get HTML[/deep_pink3]\n")
 
+        data = "<strong>Bad boy, no page for you.</strong>"
+        data += f"\n<p>{error}</p>"
         return BeautifulSoup(data, "html.parser")
 
-    html(html.prettify())
+    if DEBUG_MODE:
+        print("\n[deep_pink3]DEBUG: Printing raw HTML[/deep_pink3]\n")
+        print(html.prettify())
 
-    for tag in ['article', 'main', 'body']:
+    tags_to_search = ['article', 'main', 'body']
+    for tag in tags_to_search:
         content = html.find(tag)
         if content:
             if DEBUG_MODE == True:
@@ -87,6 +92,9 @@ def get_html(url):
                 print(content)
 
             return content
+
+    return html
+
 
 """Make a GET request and return file data"""
 def get_file(url):
@@ -159,7 +167,7 @@ def gen_path(url):
     path = output_path + '/' + path + '/'
     mkdir(path)
 
-    file = re.sub("\..*", "", tree[-1]) + '.md' # substitute extension
+    file = re.sub("\..*", "", tree[-1]) # remove extension
 
     return [path, file]
 
@@ -219,6 +227,10 @@ def scrape(url):
         print(f"\n:page_facing_up: [purple]{url}[/purple]")
     path = gen_path(url)
     html = get_html(url)
+
+    if DEBUG_MODE == True:
+        save_file(path[0] + path[1] + '.html', html.prettify(), True)
+
     html = filter_html(html)
     mkdown = parse_html(html)
     mkdown = filter_mkdown(mkdown)
@@ -228,7 +240,7 @@ def scrape(url):
 
     if CLI_MODE == False:
         mkdown = get_assets(path[0], mkdown)
-        save_file(path[0] + path[1], mkdown, True)
+        save_file(path[0] + path[1] + '.md', mkdown, True)
 
 def main():
     if CLI_MODE == False:
