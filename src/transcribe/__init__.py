@@ -155,8 +155,8 @@ def filter_mkdown(mkdown):
     # fix extra newlines
     mkdown = re.sub(r'\n{3,}', '\n\n', mkdown)
 
-    # remove trailing spaces
-    mkdown = re.sub(r'[ ]*$', '', mkdown, flags=re.MULTILINE)
+    # remove starting/trailing spaces in lines
+    mkdown = re.sub(r'^[ \t]+|[ \t]+$', '', mkdown, flags=re.MULTILINE)
 
     # remove empty blockquotes
     mkdown = re.sub(r'^>\s*\n', '', mkdown, flags=re.MULTILINE)
