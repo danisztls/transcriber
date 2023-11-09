@@ -104,15 +104,14 @@ def get_file(url):
 
 """Filter HTML to remove non-content"""
 def filter_html(html, path):
-    tags = [html.style, html.script, html.iframe]
-
-    for tag in tags:
-        if tag:
+    removable_tags = ['style', 'script', 'iframe', 'nav', 'svg']
+    for tag_name in removable_tags:
+        for tag in html.find_all(tag_name):
             tag.decompose()
 
-    # TODO: Improve performance
-    for tag in html.find_all():
-        del tag['style']
+    for tag in html.find_all(True):
+        if 'style' in tag.attrs:
+            del tag['style']
 
     if DEBUG_MODE == True:
         save_file(path[0] + path[1] + '.filtered.html', html.prettify(), True)
