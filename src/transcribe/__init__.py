@@ -105,7 +105,7 @@ def get_file(url):
 """Filter HTML to remove non-content"""
 def filter_html(html, path):
     # remove tags by name
-    removable_tags = ['style', 'script', 'iframe', 'nav', 'svg']
+    removable_tags = ['style', 'script', 'iframe', 'nav', 'svg', 'button']
     for tag_name in removable_tags:
         for tag in html.find_all(tag_name):
             tag.decompose()
@@ -117,7 +117,7 @@ def filter_html(html, path):
             del tag['style']
 
         # whitelist 
-        if tag.name == 'br' or tag.name == 'img' or tag.name == 'video' or tag.name == 'audio':
+        if tag.name == 'img' or tag.name == 'video' or tag.name == 'audio':
             continue
 
         # remove empty
