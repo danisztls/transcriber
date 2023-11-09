@@ -176,10 +176,8 @@ def save_file(path, data, overwrite=False):
 def get_assets(path, mkdown):
     # find in content all URLs that ends with a extension
 
-    # TODO: Add support for fetching local files?
-
-    # TODO: Improve this
-    assets = re.findall("\((http.*?\.jpg|JPG|jpeg|JPEG|png|PNG|webp|WEBP|avif|AVIF|pdf|PDF)\)", mkdown)
+    # TODO: Wouldn't it be better to blacklist undesireds (e.g. .html, .asp, .php) instead of whitelisting assets?
+    assets = re.findall(r"\((https?://.*?\.(?:jpg|jpeg|png|webp|avif|pdf))\)", mkdown, re.IGNORECASE)
     
     # pop what's not an HTML page
     # is_html = re.compile("^.*\.(html|htm)$")
