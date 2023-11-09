@@ -149,10 +149,17 @@ def parse_html(html):
 
 """Filter Markdown to remove undesirables"""
 def filter_mkdown(mkdown):
-    mkdown = mkdown.strip() # remove leading and trailing lines
-    # mkdown = re.sub('\s+\n', '\n', mkdown) # remove whitespace from empty lines
+    # remove leading and trailing lines
+    mkdown = mkdown.strip()
 
-    # TODO: Make some filters modular
+    # fix extra newlines
+    mkdown = re.sub(r'\n{3,}', '\n\n', mkdown)
+
+    # remove trailing spaces
+    mkdown = re.sub(r'[ ]*$', '', mkdown, flags=re.MULTILINE)
+
+    # remove empty blockquotes
+    mkdown = re.sub(r'^>\s*\n', '', mkdown, flags=re.MULTILINE)
 
     # remove link obfuscators
     google_pattern = re.compile(r"\(https://www.google.com/url\?q=(https?://.*?)&.*\)")
