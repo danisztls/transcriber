@@ -72,27 +72,14 @@ def get_html(url):
     except Exception as error:
         print(f"[red]ERROR:[/red] {error}")
 
-        if DEBUG_MODE == True:
-            print("\n[deep_pink3]DEBUG: Failed to get HTML[/deep_pink3]\n")
-
         data = "<strong>Bad boy, no page for you.</strong>"
         data += f"\n<p>{error}</p>"
         return BeautifulSoup(data, "html.parser")
 
-    if DEBUG_MODE:
-        print("\n[deep_pink3]DEBUG: Printing raw HTML[/deep_pink3]\n")
-        print(html.prettify())
-
     tags_to_search = ['article', 'main', 'body']
     for tag in tags_to_search:
         content = html.find(tag)
-        if content:
-            if DEBUG_MODE == True:
-                print("\n[deep_pink3]DEBUG: Printing HTML content[/deep_pink3]\n")
-                print(content)
-
-            return content
-
+        return content if content
     return html
 
 
@@ -124,11 +111,6 @@ def filter_html(html):
 """Parse HTML into Markdown"""
 def parse_html(html):
     mkd = MarkdownConverter(heading_style="ATX", newline_style="backslash").convert_soup(html)
-
-    if DEBUG_MODE == True:
-        print("\n[deep_pink3]DEBUG: Printing Markdown[/deep_pink3]\n")
-        print(mkd)
-
     return mkd
 
 
