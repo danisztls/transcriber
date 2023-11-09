@@ -15,7 +15,7 @@ import urllib3
 from markdownify import MarkdownConverter
 # https://github.com/matthewwithanm/python-markdownify/
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 # https://beautiful-soup-4.readthedocs.io/en/latest/
 
 import yaml
