@@ -79,7 +79,8 @@ def get_html(url):
     tags_to_search = ['article', 'main', 'body']
     for tag in tags_to_search:
         content = html.find(tag)
-        return content if content
+        if content:
+            return content
     return html
 
 
@@ -220,7 +221,7 @@ def scrape(url):
     if VERBOSE_MODE == True or CLI_MODE == True:
         print(mkdown)
 
-    if CLI_MODE == False:
+    if CLI_MODE == False or DEBUG_MODE == True:
         mkdown = get_assets(path[0], mkdown)
         save_file(path[0] + path[1] + '.md', mkdown, True)
 
