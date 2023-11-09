@@ -84,6 +84,10 @@ def get_html(url, path):
     for tag in tags_to_search:
         content = html.find(tag)
         if content:
+            if tag == "body":
+                content.header.decompose()
+                content.footer.decompose()
+
             if DEBUG_MODE == True:
                 save_file(path[0] + path[1] + '.content.html', html.prettify(), True)
 
