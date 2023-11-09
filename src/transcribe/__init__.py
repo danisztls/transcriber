@@ -15,7 +15,7 @@ import urllib3
 from markdownify import MarkdownConverter
 # https://github.com/matthewwithanm/python-markdownify/
 
-from bs4 import BeautifulSoup, Comment
+from bs4 import BeautifulSoup
 # https://beautiful-soup-4.readthedocs.io/en/latest/
 
 import yaml
@@ -136,8 +136,11 @@ def filter_html(html, path):
 
 """Parse HTML into Markdown"""
 def parse_html(html):
-    mkd = MarkdownConverter(heading_style="ATX", newline_style="backslash").convert_soup(html)
-    return mkd
+    options = {
+        "heading_style": "ATX",
+        "newline_style": "backslash"
+    }
+    return MarkdownConverter(**options).convert_soup(html)
 
 
 """Filter Markdown to remove undesirables"""
