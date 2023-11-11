@@ -40,8 +40,8 @@ DEBUG_MODE = args.debug
 
 output_path = str(pathlib.Path().absolute()) + '/output'
 
-"""Traverse a path and create nonexistent dirs"""
 def mkdir(path):
+    """Traverse a path and create nonexistent dirs"""
     dirs = path.strip('/').split('/')
     path = ''
 
@@ -50,8 +50,8 @@ def mkdir(path):
         if not os.path.exists(path):
             os.mkdir(path)
 
-"""Make a GET request and return HTML excerpt"""
 def get_html(url, path):
+    """Make a GET request and return HTML excerpt"""
     http = urllib3.PoolManager()
     # mimic google crawler to bypass paywalls
     # headers = urllib3.make_headers(user_agent="Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")
@@ -98,8 +98,8 @@ def get_html(url, path):
 
     return html
 
-"""Make a GET request and return file data"""
 def get_file(url):
+    """Make a GET request and return file data"""
     try:
         response = http.request("GET", url)
         data = response.data
@@ -109,8 +109,11 @@ def get_file(url):
     
     return data 
 
-"""Filter HTML to remove non-content"""
 def filter_html(html, path):
+    """Filter HTML to remove non-content"""
+    # TODO: Remove non-standard HTML tags (as those can't be parsed)
+    # TODO: Convert AMP tags to standard?
+
     # remove tags by name
     removable_tags = ['style', 'script', 'iframe', 'nav', 'svg', 'button']
     for tag_name in removable_tags:
@@ -141,8 +144,8 @@ def filter_html(html, path):
 
     return html
 
-"""Parse HTML into Markdown"""
 def parse_html(html):
+    """Parse HTML into Markdown"""
     options = {
         "heading_style": "ATX",
         "newline_style": "backslash"
@@ -150,8 +153,8 @@ def parse_html(html):
     return MarkdownConverter(**options).convert_soup(html)
 
 
-"""Filter Markdown to remove undesirables"""
 def filter_mkdown(mkdown):
+    """Filter Markdown to remove undesirables"""
     # remove leading and trailing lines
     mkdown = mkdown.strip()
 
@@ -170,8 +173,8 @@ def filter_mkdown(mkdown):
 
     return mkdown
 
-"""Generate file path from URL"""
 def gen_path(url):
+    """Generate file path from URL"""
     # parse url
     tree = re.match("(https?|file)://(.*)", url).group(2).split('/')
 
@@ -196,8 +199,8 @@ def gen_path(url):
 
     return [path, file]
 
-"""Save data to disk"""
 def save_file(path, data, overwrite=False):
+    """Save data to disk"""
     if not os.path.exists(path) or overwrite:
         with open(path, 'w') as file:
             file.write(data)
@@ -205,8 +208,8 @@ def save_file(path, data, overwrite=False):
     else:
         print(f"[gray]{path}[/gray] [yellow]already exists![/yellow]")
 
-"""Download assets referenced in the Markdown content and rewrite URLs to point to local files"""
 def get_assets(path, mkdown):
+    """Download assets referenced in the Markdown content and rewrite URLs to point to local files"""
     # find in content all URLs that ends with a extension
 
     # TODO: Wouldn't it be better to blacklist undesireds (e.g. .html, .asp, .php) instead of whitelisting assets?
@@ -231,8 +234,8 @@ def get_assets(path, mkdown):
             
     return mkdown
 
-"""Measure execution time of function"""
 class chronometer:
+    """Measure execution time of function"""
     def __call__(self, func):
         def wrapper(*args, **kwargs):
             start = time.time()
@@ -245,9 +248,9 @@ class chronometer:
             return result
         return wrapper
 
-"""Scrape URL and save Makdown content to disk"""
 @chronometer()
 def scrape(url):
+    """Scrape URL and save Makdown content to disk"""
     if CLI_MODE == False:
         print(f"\n:page_facing_up: [purple]{url}[/purple]")
     path = gen_path(url)
