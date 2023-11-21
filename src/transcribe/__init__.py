@@ -54,10 +54,10 @@ def get_html(url, path):
     """Make a GET request and return HTML excerpt"""
     http = urllib3.PoolManager()
     # mimic google crawler to bypass paywalls
-    # headers = urllib3.make_headers(user_agent="Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")
+    headers = urllib3.make_headers(user_agent="Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")
     # some sites will block crawlers
-    # headers = urllib3.make_headers(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
-)
+    # headers = urllib3.make_headers(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36")
+
     try:
         if re.match(r"https?://.*", url):
             response = http.request("GET", url, headers=headers)
