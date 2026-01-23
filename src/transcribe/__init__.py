@@ -1,290 +1,363 @@
 #!/usr/bin/env python
-
 """
 Scrape Web content into markdown
 """
 
-__author__  = "Daniel Souza <me@posix.dev.br>"
+__author__ = "Daniel Souza <me@posix.dev.br>"
 __license__ = "GPLv3"
 
-import argparse, re, uuid, os, pathlib, time
+import argparse
+import os
+import pathlib
+import re
+import time
+from urllib.parse import urlparse, unquote
 
 import urllib3
-# https://urllib3.readthedocs.io/en/stable/
-
-from markdownify import MarkdownConverter
-# https://github.com/matthewwithanm/python-markdownify/
-
 from bs4 import BeautifulSoup, Comment
-# https://beautiful-soup-4.readthedocs.io/en/latest/
-
-import yaml
-# https://github.com/yaml/pyyaml
-
+from markdownify import MarkdownConverter
 from rich import print
-# https://github.com/Textualize/rich
-# https://github.com/Textualize/rich/blob/master/rich/_emoji_codes.py
+import yaml
 
-# parse arguments
-parser = argparse.ArgumentParser()
-parser.add_argument('-t', '--target', dest='target', help="URL to scrap")
-parser.add_argument('-l', '--list', dest='list', help="YAML list of URLs to scrap")
-parser.add_argument('-c', '--cli-mode', dest='cli', default=False, help="CLI mode (only print content to STDOUT)", action="store_true")
-parser.add_argument('-v', '--verbose', dest='verbose', default=False, help="verbose mode (print content to STDOUT)", action="store_true")
-parser.add_argument('-d', '--debug', dest='debug', default=False, help="debug mode", action="store_true")
-args = parser.parse_args()
+output_path = str(pathlib.Path().absolute() / "output")
+_http = urllib3.PoolManager()
 
-CLI_MODE = args.cli
-VERBOSE_MODE = args.verbose
-DEBUG_MODE = args.debug
+# Runtime flags (set in main())
+CLI_MODE = False
+VERBOSE_MODE = False
+DEBUG_MODE = False
 
-output_path = str(pathlib.Path().absolute()) + '/output'
+def mkdir(path: str) -> None:
+    """Traverse a path and create nonexistent dirs."""
+    if not path:
+        return
+    os.makedirs(path, exist_ok=True)
 
-def mkdir(path):
-    """Traverse a path and create nonexistent dirs"""
-    dirs = path.strip('/').split('/')
-    path = ''
 
-    for dir in dirs:
-        path += '/' + dir 
-        if not os.path.exists(path):
-            os.mkdir(path)
+def get_response_data(
+    url: str,
+    *,
+    timeout: urllib3.Timeout = urllib3.Timeout(connect=5.0, read=30.0),
+    retries: int = 0,
+) -> bytes:
+    """Make a GET request and return the response body as bytes."""
+    user_agents = [
+        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Mozilla/5.0 (compatible; Bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+        "Mozilla/5.0 (compatible; DuckDuckBot/1.0; +http://duckduckgo.com/duckduckbot.html)",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    ]
 
-def get_html(url, path):
-    """Make a GET request and return HTML excerpt"""
-    http = urllib3.PoolManager()
-    # mimic google crawler to bypass paywalls
-    headers = urllib3.make_headers(user_agent="Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")
-    # some sites will block crawlers
-    # headers = urllib3.make_headers(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36")
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError("URL must be a non-empty string")
+
+    url = url.strip()
+    if not re.match(r"^https?://", url):
+        raise ValueError("URL must start with http:// or https://")
+
+    last_error = None
+    last_status = None
+    retryable_statuses = {401, 403, 429, 503}
+
+    for ua in user_agents:
+        headers = urllib3.make_headers(user_agent=ua)
+        try:
+            response = _http.request(
+                "GET",
+                url,
+                headers=headers,
+                redirect=True,
+                timeout=timeout,
+                retries=retries,
+            )
+            last_status = getattr(response, "status", None)
+
+            if last_status == 200:
+                return response.data
+
+            if last_status not in retryable_statuses:
+                break
+        except Exception as e:
+            last_error = e
+            last_status = None
+
+    if last_status is not None:
+        raise ValueError(f"HTTP request failed for URL: {url}. Status: {last_status}")
+    raise ValueError(f"HTTP request failed for URL: {url}. {last_error}")
+
+
+def get_html(url: str, path) -> BeautifulSoup:
+    """Fetch URL and return a best-effort content node (article/main/body)."""
+
+    def _error_html(error: Exception) -> BeautifulSoup:
+        _data = "<strong>No page for you.</strong>"
+        _data += f"\n<p>{error}</p>"
+        return BeautifulSoup(_data, "html.parser")
 
     try:
-        if re.match(r"https?://.*", url):
-            response = http.request("GET", url, headers=headers)
-            if response.status != 200:
-                raise ValueError(f"HTTP Error: {response.status} for URL: {url}")
-            html = BeautifulSoup(response.data, 'html.parser')
-
-        elif re.match(r"file://.*", url): 
-            path = re.sub(r"^file://", "", url)
-            with open(path, 'r', encoding='utf-8') as file:
-                html = BeautifulSoup(file, 'html.parser')
-        else:
-            raise ValueError("URL must start with http://, https://, or file://")
-
+        html = BeautifulSoup(get_response_data(url), "html.parser")
     except Exception as error:
         print(f"[red]ERROR:[/red] {error}")
+        return _error_html(error)
 
-        data = "<strong>Bad boy, no page for you.</strong>"
-        data += f"\n<p>{error}</p>"
-        return BeautifulSoup(data, "html.parser")
+    if DEBUG_MODE:
+        save_file(path[0] + path[1] + ".raw.html", html.prettify(), overwrite=True)
 
-    if DEBUG_MODE == True:
-        save_file(path[0] + path[1] + '.raw.html', html.prettify(), True)
-
-    # get content via tag
-    tags_to_search = ['article', 'main', 'body']
-    for tag in tags_to_search:
+    for tag in ("article", "main", "body"):
         content = html.find(tag)
-        if content:
-            if tag == "body":
-                content.header.decompose()
-                content.footer.decompose()
+        if not content:
+            continue
 
-            if DEBUG_MODE == True:
-                save_file(path[0] + path[1] + '.content.html', content.prettify(), True)
+        if tag == "body":
+            for t in content.find_all(("header", "footer")):
+                t.decompose()
 
-            return content
+        if DEBUG_MODE:
+            save_file(
+                path[0] + path[1] + ".content.html", content.prettify(), overwrite=True
+            )
+
+        return content
 
     return html
 
-def get_file(url):
-    """Make a GET request and return file data"""
-    try:
-        response = http.request("GET", url)
-        data = response.data
 
-    except Exception as e:
-        data = None
-    
-    return data 
-
-def filter_html(html, path):
-    """Filter HTML to remove non-content"""
-    # TODO: Remove non-standard HTML tags (as those can't be parsed)
-    # TODO: Convert AMP tags to standard?
-
-    # remove tags by name
-    removable_tags = ['style', 'script', 'iframe', 'nav', 'svg', 'button']
+def filter_html(html: BeautifulSoup, path) -> BeautifulSoup:
+    """Filter HTML to remove non-content."""
+    removable_tags = ["style", "script", "iframe", "nav", "svg", "button"]
     for tag_name in removable_tags:
         for tag in html.find_all(tag_name):
             tag.decompose()
 
-    # filter tags
     for tag in html.find_all(True):
-        # remove style attrs
-        if 'style' in tag.attrs:
-            del tag['style']
+        if "style" in tag.attrs:
+            del tag["style"]
 
-        # whitelist 
-        if tag.name == 'img' or tag.name == 'video' or tag.name == 'audio':
+        if tag.name in ("img", "video", "audio"):
             continue
 
-        # remove empty
-        if not tag.contents:
+        if not tag.get_text(strip=True) and not tag.find_all(("img", "video", "audio")):
             tag.decompose()
 
-    # remove comments
-    comments = html.findAll(text=lambda text: isinstance(text, Comment))
-    for comment in comments:
+    for comment in html.find_all(string=lambda text: isinstance(text, Comment)):
         comment.extract()
 
-    if DEBUG_MODE == True:
-        save_file(path[0] + path[1] + '.filtered.html', html.prettify(), True)
+    if DEBUG_MODE:
+        save_file(
+            path[0] + path[1] + ".filtered.html", html.prettify(), overwrite=True
+        )
 
     return html
 
-def parse_html(html):
-    """Parse HTML into Markdown"""
-    options = {
-        "heading_style": "ATX",
-        "newline_style": "backslash"
-    }
+
+def parse_html(html: BeautifulSoup) -> str:
+    """Parse HTML into Markdown."""
+    options = {"heading_style": "ATX", "newline_style": "backslash"}
     return MarkdownConverter(**options).convert_soup(html)
 
 
-def filter_mkdown(mkdown):
-    """Filter Markdown to remove undesirables"""
-    # remove leading and trailing lines
+def filter_mkdown(mkdown: str) -> str:
+    """Filter Markdown to remove undesirables."""
     mkdown = mkdown.strip()
-
-    # fix extra newlines
-    mkdown = re.sub(r'\n{3,}', '\n\n', mkdown)
-
-    # remove starting/trailing spaces in lines
-    mkdown = re.sub(r'^[ \t]+|[ \t]+$', '', mkdown, flags=re.MULTILINE)
-
-    # remove empty blockquotes
-    mkdown = re.sub(r'^>\s*\n', '', mkdown, flags=re.MULTILINE)
-
-    # remove link obfuscators
-    google_pattern = re.compile(r"\(https://www.google.com/url\?q=(https?://.*?)&.*\)")
+    mkdown = re.sub(r"\n{3,}", "\n\n", mkdown)
+    mkdown = re.sub(r"^[ \t]+|[ \t]+$", "", mkdown, flags=re.MULTILINE)
+    mkdown = re.sub(r"^>\s*\n", "", mkdown, flags=re.MULTILINE)
+    google_pattern = re.compile(
+        r"\(https://www.google.com/url\?q=(https?://.*?)&.*\)"
+    )
     mkdown = re.sub(google_pattern, r"(\1)", mkdown)
-
     return mkdown
 
-def gen_path(url):
-    """Generate file path from URL"""
-    # parse url
-    tree = re.match("(https?|file)://(.*)", url).group(2).split('/')
 
-    # http(s)://
-    if re.match("https?://.*", url):
-        
-        # remove trailing slash
-        if tree[-1] == '':
+def _safe_segment(s: str) -> str:
+    s = re.sub(r"[^a-zA-Z0-9._-]+", "_", s).strip("_")
+    return s or "unknown"
+
+
+def gen_path(url: str):
+    """Generate file path from URL."""
+    m = re.match(r"^(https?|file)://(.*)$", url)
+    if not m:
+        raise ValueError("Invalid URL")
+
+    scheme = m.group(1)
+    remainder = m.group(2)
+    tree = remainder.split("/")
+
+    if scheme in ("http", "https"):
+        if tree and tree[-1] == "":
             tree.pop()
+        base = _safe_segment(tree[0] if tree else "unknown")
+    else:
+        parent = tree[-2] if len(tree) >= 2 else "unknown"
+        base = "local/" + _safe_segment(parent)
 
-        # construct path
-        path = tree[0]
-
-    # file://
-    elif re.match("file://.*", url): 
-        path = "local/" + tree[-2]
-    
-    path = output_path + '/' + path + '/'
+    path = output_path + "/" + base + "/"
     mkdir(path)
 
-    file = re.sub("\..*", "", tree[-1]) # remove extension
+    last = tree[-1] if tree else "index"
+    last = last.split("?", 1)[0].split("#", 1)[0]
+    last = unquote(last)
 
-    return [path, file]
+    file_stem = re.sub(r"\..*", "", last) or "index"
+    file_stem = _safe_segment(file_stem)
 
-def save_file(path, data, overwrite=False):
-    """Save data to disk"""
-    if not os.path.exists(path) or overwrite:
-        with open(path, 'w') as file:
-            file.write(data)
-    
-    else:
+    return [path, file_stem]
+
+
+def save_file(path: str, data, overwrite: bool = False) -> None:
+    """Save data to disk."""
+    if os.path.exists(path) and not overwrite:
         print(f"[gray]{path}[/gray] [yellow]already exists![/yellow]")
+        return
 
-def get_assets(path, mkdown):
-    """Download assets referenced in the Markdown content and rewrite URLs to point to local files"""
-    # find in content all URLs that ends with a extension
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
 
-    # TODO: Wouldn't it be better to blacklist undesireds (e.g. .html, .asp, .php) instead of whitelisting assets?
-    assets = re.findall(r"\((https?://.*?\.(?:jpg|jpeg|png|webp|avif|pdf))\)", mkdown, re.IGNORECASE)
-    
-    # pop what's not an HTML page
-    # is_html = re.compile("^.*\.(html|htm)$")
-    # for url in enumerate(assets):
-    #     if is_html.match(url[1]):
-    #         assets.pop(url[0])
+    if isinstance(data, (bytes, bytearray)):
+        with open(path, "wb") as f:
+            f.write(data)
+    else:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(data)
 
-    # get assets
-    for url in assets:
-        if CLI_MODE == False:
+def get_assets(dir_path: str, html: BeautifulSoup) -> str:
+    """Download linked assets and rewrite their URLs on BeautifulSoup object with their output paths."""
+    urls: list[str] = []
+    for tag in ("img", "video", "audio"):
+        for el in html.find_all(tag):
+            src = el.get("src")
+            urls.append(src)
+
+    seen: set[str] = set()
+    for url in urls:
+        if url in seen:
+            continue
+        seen.add(url)
+
+        if not CLI_MODE:
             print(f"\n:paperclip: [gray]{url}[/gray]")
-        data = get_file(url)
-        file = re.match("^.*\/(.*?)$", url).group(1)
 
-        if data:
-            save_file(path + file, data)
-            mkdown = mkdown.replace(url, '../' + file)
-            
-    return mkdown
+        try:
+            data = get_response_data(url)
+        except Exception:
+            continue
+
+        parsedPath = urlparse(url).path
+        filename = os.path.basename(parsedPath)
+        filename = unquote(filename)
+        filename = _safe_segment(filename)
+
+        save_file(os.path.join(dir_path, filename), data, overwrite=True)
+
+        for tag in ("img", "video", "audio"):
+            for el in html.find_all(tag):
+                src = el.get("src")
+                if src == url:
+                    el["src"] = f"./{filename}"
+
+    return str(html)
+
 
 class chronometer:
-    """Measure execution time of function"""
+    """Measure execution time of function."""
+
     def __call__(self, func):
         def wrapper(*args, **kwargs):
             start = time.time()
             result = func(*args, **kwargs)
             end = time.time()
 
-            if CLI_MODE == False:
+            if not CLI_MODE:
                 print("[green]%s seconds[/green]" % str(round(end - start, 2)))
-            
+
             return result
+
         return wrapper
 
+
 @chronometer()
-def scrape(url):
-    """Scrape URL and save Makdown content to disk"""
-    if CLI_MODE == False:
+def scrape(url: str) -> None:
+    """Scrape URL and save Markdown content to disk."""
+    if not CLI_MODE:
         print(f"\n:page_facing_up: [purple]{url}[/purple]")
+
     path = gen_path(url)
     html = get_html(url, path)
     html = filter_html(html, path)
     mkdown = parse_html(html)
 
-    if DEBUG_MODE == True:
-        save_file(path[0] + path[1] + '.raw.md', mkdown, True)
+    if DEBUG_MODE:
+        save_file(path[0] + path[1] + ".raw.md", mkdown, overwrite=True)
 
     mkdown = filter_mkdown(mkdown)
 
-    if CLI_MODE == False:
-        mkdown = get_assets(path[0], mkdown)
+    if not CLI_MODE:
+        mkdown = get_assets(path[0], html)
 
-    if DEBUG_MODE == True or CLI_MODE == False:
-        save_file(path[0] + path[1] + '.md', mkdown, True)
+    if DEBUG_MODE or not CLI_MODE:
+        save_file(path[0] + path[1] + ".md", mkdown, overwrite=True)
 
-    if VERBOSE_MODE == True or CLI_MODE == True:
+    if VERBOSE_MODE or CLI_MODE:
         print(mkdown)
 
-def main():
-    if CLI_MODE == False:
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-t", "--target", dest="target", help="URL to scrap")
+    parser.add_argument("-l", "--list", dest="list", help="YAML list of URLs to scrap")
+    parser.add_argument(
+        "-c",
+        "--cli-mode",
+        dest="cli",
+        default=False,
+        help="CLI mode (only print content to STDOUT)",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        default=False,
+        help="verbose mode (print content to STDOUT)",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-d", "--debug", dest="debug", default=False, help="debug mode", action="store_true"
+    )
+    return parser
+
+
+def main(argv=None) -> None:
+    global CLI_MODE, VERBOSE_MODE, DEBUG_MODE
+
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+
+    CLI_MODE = args.cli
+    VERBOSE_MODE = args.verbose
+    DEBUG_MODE = args.debug
+
+    if not CLI_MODE:
         print(":spider: scraping...")
 
     if args.target:
         scrape(args.target)
 
-    if args.list: 
-        with open(args.list, 'r') as file:
-            urls = yaml.safe_load(file)
+    if args.list:
+        with open(args.list, "r", encoding="utf-8") as file:
+            urls = yaml.safe_load(file) or []
 
         for url in urls:
-          scrape(url)
-   
+            scrape(url)
+
     if not args.target and not args.list:
         print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")
+
+
+if __name__ == "__main__":
+    main()
+
