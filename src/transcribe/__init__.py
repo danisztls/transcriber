@@ -72,6 +72,9 @@ def get_response_data(
                 timeout=timeout,
                 retries=retries,
             )
+
+            print(f"{headers}: {response.status}")
+
             last_status = getattr(response, "status", None)
 
             if last_status == 200:
@@ -91,16 +94,12 @@ def get_response_data(
 def get_html(url: str, path) -> BeautifulSoup:
     """Fetch URL and return a best-effort content node (article/main/body)."""
 
-    def _error_html(error: Exception) -> BeautifulSoup:
-        _data = "<strong>No page for you.</strong>"
-        _data += f"\n<p>{error}</p>"
-        return BeautifulSoup(_data, "html.parser")
-
     try:
         html = BeautifulSoup(get_response_data(url), "html.parser")
-    except Exception as error:
-        print(f"[red]ERROR:[/red] {error}")
-        return _error_html(error)
+
+    except Exception as e:
+        print(f"[red]ERROR:[/red] {e}")
+        raise RuntimeError("Failed to Get HTML") from e
 
     if DEBUG_MODE:
         save_file(path[0] + path[1] + ".raw.html", html.prettify(), overwrite=True)
@@ -126,28 +125,26 @@ def get_html(url: str, path) -> BeautifulSoup:
 
 def filter_html(html: BeautifulSoup, path) -> BeautifulSoup:
     """Filter HTML to remove non-content."""
-    removable_tags = ["style", "script", "iframe", "nav", "svg", "button"]
-    for tag_name in removable_tags:
-        for tag in html.find_all(tag_name):
-            tag.decompose()
+    removable_tags = ("style", "script", "iframe", "nav", "svg", "button")
+    for el in html.find_all(removable_tags):
+        el.decompose()
 
-    for tag in html.find_all(True):
-        if "style" in tag.attrs:
-            del tag["style"]
+    for el in list(html.find_all(True)):
+        # FIXME
+        # if el.has_attr["style"]:
+        #     del el["style"]
 
-        if tag.name in ("img", "video", "audio"):
+        if el.name in ("img", "video", "audio"):
             continue
 
-        if not tag.get_text(strip=True) and not tag.find_all(("img", "video", "audio")):
-            tag.decompose()
+        if not el.get_text(strip=True) and not el.find(("img", "video", "audio")):
+            el.decompose()
 
     for comment in html.find_all(string=lambda text: isinstance(text, Comment)):
         comment.extract()
 
     if DEBUG_MODE:
-        save_file(
-            path[0] + path[1] + ".filtered.html", html.prettify(), overwrite=True
-        )
+        save_file(path[0] + path[1] + ".filtered.html", html.prettify(), overwrite=True)
 
     return html
 
@@ -224,7 +221,7 @@ def save_file(path: str, data, overwrite: bool = False) -> None:
         with open(path, "w", encoding="utf-8") as f:
             f.write(data)
 
-def get_assets(dir_path: str, html: BeautifulSoup) -> str:
+def get_assets(dir_path: str, html: BeautifulSoup) -> BeautifulSoup:
     """Download linked assets and rewrite their URLs on BeautifulSoup object with their output paths."""
     urls: list[str] = []
     for tag in ("img", "video", "audio"):
@@ -259,7 +256,7 @@ def get_assets(dir_path: str, html: BeautifulSoup) -> str:
                 if src == url:
                     el["src"] = f"./{filename}"
 
-    return str(html)
+    return html
 
 
 class chronometer:
@@ -286,23 +283,27 @@ def scrape(url: str) -> None:
         print(f"\n:page_facing_up: [purple]{url}[/purple]")
 
     path = gen_path(url)
-    html = get_html(url, path)
-    html = filter_html(html, path)
-    mkdown = parse_html(html)
+
+    try:
+        html = get_html(url, path)
+    except Exception:
+        return 
+
+    html_filtred = filter_html(html, path)
+    html_rewritten = get_assets(path[0], html_filtred)
+
+    mkdown = parse_html(html_rewritten)
 
     if DEBUG_MODE:
         save_file(path[0] + path[1] + ".raw.md", mkdown, overwrite=True)
 
-    mkdown = filter_mkdown(mkdown)
-
-    if not CLI_MODE:
-        mkdown = get_assets(path[0], html)
+    mkdown_filtred = filter_mkdown(mkdown)
 
     if DEBUG_MODE or not CLI_MODE:
-        save_file(path[0] + path[1] + ".md", mkdown, overwrite=True)
+        save_file(path[0] + path[1] + ".md", mkdown_filtred, overwrite=True)
 
     if VERBOSE_MODE or CLI_MODE:
-        print(mkdown)
+        print(mkdown_filtred)
 
 
 def _build_parser() -> argparse.ArgumentParser:
