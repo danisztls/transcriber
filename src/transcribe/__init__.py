@@ -11,7 +11,8 @@ import os
 import pathlib
 import re
 import time
-from urllib.parse import urlparse, unquote
+from typing import Any, Optional
+from urllib.parse import unquote, urljoin, urlparse
 
 import urllib3
 from bs4 import BeautifulSoup, Comment
@@ -26,6 +27,7 @@ _http = urllib3.PoolManager()
 CLI_MODE = False
 VERBOSE_MODE = False
 DEBUG_MODE = False
+
 
 def mkdir(path: str) -> None:
     """Traverse a path and create nonexistent dirs."""
@@ -57,8 +59,8 @@ def get_response_data(
     if not re.match(r"^https?://", url):
         raise ValueError("URL must start with http:// or https://")
 
-    last_error = None
-    last_status = None
+    last_error: Optional[BaseException] = None
+    last_status: Optional[int] = None
     retryable_statuses = {401, 403, 429, 503}
 
     for ua in user_agents:
@@ -73,7 +75,9 @@ def get_response_data(
                 retries=retries,
             )
 
-            print(f"{headers}: {response.status}")
+            # Avoid noisy/always-on debug output. Use DEBUG_MODE only.
+            if DEBUG_MODE:
+                print(f"[gray]{url}[/gray] -> {response.status} ({ua})")
 
             last_status = getattr(response, "status", None)
 
@@ -93,16 +97,14 @@ def get_response_data(
 
 def get_html(url: str, path) -> BeautifulSoup:
     """Fetch URL and return a best-effort content node (article/main/body)."""
-
     try:
         html = BeautifulSoup(get_response_data(url), "html.parser")
-
     except Exception as e:
         print(f"[red]ERROR:[/red] {e}")
         raise RuntimeError("Failed to Get HTML") from e
 
     if DEBUG_MODE:
-        save_file(path[0] + path[1] + ".raw.html", html.prettify(), overwrite=True)
+        save_file(os.path.join(path[0], path[1] + ".raw.html"), html.prettify(), overwrite=True)
 
     for tag in ("article", "main", "body"):
         content = html.find(tag)
@@ -115,7 +117,9 @@ def get_html(url: str, path) -> BeautifulSoup:
 
         if DEBUG_MODE:
             save_file(
-                path[0] + path[1] + ".content.html", content.prettify(), overwrite=True
+                os.path.join(path[0], path[1] + ".content.html"),
+                content.prettify(),
+                overwrite=True,
             )
 
         return content
@@ -130,10 +134,6 @@ def filter_html(html: BeautifulSoup, path) -> BeautifulSoup:
         el.decompose()
 
     for el in list(html.find_all(True)):
-        # FIXME
-        # if el.has_attr["style"]:
-        #     del el["style"]
-
         if el.name in ("img", "video", "audio"):
             continue
 
@@ -144,7 +144,11 @@ def filter_html(html: BeautifulSoup, path) -> BeautifulSoup:
         comment.extract()
 
     if DEBUG_MODE:
-        save_file(path[0] + path[1] + ".filtered.html", html.prettify(), overwrite=True)
+        save_file(
+            os.path.join(path[0], path[1] + ".filtered.html"),
+            html.prettify(),
+            overwrite=True,
+        )
 
     return html
 
@@ -161,9 +165,8 @@ def filter_mkdown(mkdown: str) -> str:
     mkdown = re.sub(r"\n{3,}", "\n\n", mkdown)
     mkdown = re.sub(r"^[ \t]+|[ \t]+$", "", mkdown, flags=re.MULTILINE)
     mkdown = re.sub(r"^>\s*\n", "", mkdown, flags=re.MULTILINE)
-    google_pattern = re.compile(
-        r"\(https://www.google.com/url\?q=(https?://.*?)&.*\)"
-    )
+
+    google_pattern = re.compile(r"\(https://www.google.com/url\?q=(https?://.*?)&.*\)")
     mkdown = re.sub(google_pattern, r"(\1)", mkdown)
     return mkdown
 
@@ -174,37 +177,52 @@ def _safe_segment(s: str) -> str:
 
 
 def gen_path(url: str):
-    """Generate file path from URL."""
-    m = re.match(r"^(https?|file)://(.*)$", url)
-    if not m:
+    """Generate file path from URL preserving URL subpath."""
+    parsed = urlparse(url)
+
+    if parsed.scheme not in ("http", "https", "file"):
         raise ValueError("Invalid URL")
 
-    scheme = m.group(1)
-    remainder = m.group(2)
-    tree = remainder.split("/")
+    if parsed.scheme in ("http", "https"):
+        base = _safe_segment(parsed.netloc or "unknown")
+        url_path = unquote(parsed.path or "/")
 
-    if scheme in ("http", "https"):
-        if tree and tree[-1] == "":
-            tree.pop()
-        base = _safe_segment(tree[0] if tree else "unknown")
+        segments = [seg for seg in url_path.split("/") if seg]
+        if segments:
+            last = segments[-1]
+            if "." in last:
+                file_seg = _safe_segment(last.rsplit(".", 1)[0]) or "index"
+                subdirs = segments[:-1]
+            else:
+                file_seg = "index"
+                subdirs = segments
+        else:
+            file_seg = "index"
+            subdirs = []
+
+        subdirs = [_safe_segment(s) for s in subdirs if _safe_segment(s)]
+        dir_path = os.path.join(output_path, base, *subdirs, "")
+        mkdir(dir_path)
+        return [dir_path, file_seg]
+
+    local_path = unquote(parsed.path or "")
+    local_path = os.path.normpath(local_path)
+
+    parent_dir = os.path.basename(os.path.dirname(local_path)) or "unknown"
+    base = os.path.join("local", _safe_segment(parent_dir))
+
+    filename = os.path.basename(local_path) or "index"
+    if "." in filename:
+        file_seg = _safe_segment(filename.rsplit(".", 1)[0]) or "index"
     else:
-        parent = tree[-2] if len(tree) >= 2 else "unknown"
-        base = "local/" + _safe_segment(parent)
+        file_seg = _safe_segment(filename) or "index"
 
-    path = output_path + "/" + base + "/"
-    mkdir(path)
-
-    last = tree[-1] if tree else "index"
-    last = last.split("?", 1)[0].split("#", 1)[0]
-    last = unquote(last)
-
-    file_stem = re.sub(r"\..*", "", last) or "index"
-    file_stem = _safe_segment(file_stem)
-
-    return [path, file_stem]
+    dir_path = os.path.join(output_path, base, "")
+    mkdir(dir_path)
+    return [dir_path, file_seg]
 
 
-def save_file(path: str, data, overwrite: bool = False) -> None:
+def save_file(path: str, data: Any, overwrite: bool = False) -> None:
     """Save data to disk."""
     if os.path.exists(path) and not overwrite:
         print(f"[gray]{path}[/gray] [yellow]already exists![/yellow]")
@@ -219,41 +237,46 @@ def save_file(path: str, data, overwrite: bool = False) -> None:
             f.write(data)
     else:
         with open(path, "w", encoding="utf-8") as f:
-            f.write(data)
+            f.write(str(data))
 
-def get_assets(dir_path: str, html: BeautifulSoup) -> BeautifulSoup:
+
+def get_assets(dir_path: str, base_url: str, html: BeautifulSoup) -> BeautifulSoup:
     """Download linked assets and rewrite their URLs on BeautifulSoup object with their output paths."""
     urls: list[str] = []
     for tag in ("img", "video", "audio"):
         for el in html.find_all(tag):
             src = el.get("src")
-            urls.append(src)
+            if src:
+                urls.append(src)
 
     seen: set[str] = set()
-    for url in urls:
-        if url in seen:
+    for raw in urls:
+        if raw in seen:
             continue
-        seen.add(url)
+        seen.add(raw)
+
+        # Resolve relative URLs against the page URL
+        resolved = urljoin(base_url, raw)
+        parsed = urlparse(resolved)
+        if parsed.scheme not in ("http", "https"):
+            continue
 
         if not CLI_MODE:
-            print(f"\n:paperclip: [gray]{url}[/gray]")
+            print(f"\n[gray]{resolved}[/gray]")
 
         try:
-            data = get_response_data(url)
+            data = get_response_data(resolved)
         except Exception:
             continue
 
-        parsedPath = urlparse(url).path
-        filename = os.path.basename(parsedPath)
-        filename = unquote(filename)
-        filename = _safe_segment(filename)
-
+        filename = _safe_segment(os.path.basename(parsed.path) or "asset")
         save_file(os.path.join(dir_path, filename), data, overwrite=True)
 
+        # Rewrite references (match original raw AND resolved variants conservatively)
         for tag in ("img", "video", "audio"):
             for el in html.find_all(tag):
                 src = el.get("src")
-                if src == url:
+                if src == raw:
                     el["src"] = f"./{filename}"
 
     return html
@@ -280,30 +303,30 @@ class chronometer:
 def scrape(url: str) -> None:
     """Scrape URL and save Markdown content to disk."""
     if not CLI_MODE:
-        print(f"\n:page_facing_up: [purple]{url}[/purple]")
+        print(f"\n[purple]{url}[/purple]")
 
     path = gen_path(url)
 
     try:
         html = get_html(url, path)
     except Exception:
-        return 
+        return
 
-    html_filtred = filter_html(html, path)
-    html_rewritten = get_assets(path[0], html_filtred)
+    html_filtered = filter_html(html, path)
+    html_rewritten = get_assets(path[0], url, html_filtered)
 
     mkdown = parse_html(html_rewritten)
 
     if DEBUG_MODE:
-        save_file(path[0] + path[1] + ".raw.md", mkdown, overwrite=True)
+        save_file(os.path.join(path[0], path[1] + ".raw.md"), mkdown, overwrite=True)
 
-    mkdown_filtred = filter_mkdown(mkdown)
+    mkdown_filtered = filter_mkdown(mkdown)
 
     if DEBUG_MODE or not CLI_MODE:
-        save_file(path[0] + path[1] + ".md", mkdown_filtred, overwrite=True)
+        save_file(os.path.join(path[0], path[1] + ".md"), mkdown_filtered, overwrite=True)
 
     if VERBOSE_MODE or CLI_MODE:
-        print(mkdown_filtred)
+        print(mkdown_filtered)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -327,7 +350,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
     )
     parser.add_argument(
-        "-d", "--debug", dest="debug", default=False, help="debug mode", action="store_true"
+        "-d",
+        "--debug",
+        dest="debug",
+        default=False,
+        help="debug mode",
+        action="store_true",
     )
     return parser
 
@@ -352,8 +380,12 @@ def main(argv=None) -> None:
         with open(args.list, "r", encoding="utf-8") as file:
             urls = yaml.safe_load(file) or []
 
+        if not isinstance(urls, list):
+            raise ValueError("YAML list file must contain a top-level list of URLs")
+
         for url in urls:
-            scrape(url)
+            if isinstance(url, str) and url.strip():
+                scrape(url.strip())
 
     if not args.target and not args.list:
         print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")
@@ -361,4 +393,3 @@ def main(argv=None) -> None:
 
 if __name__ == "__main__":
     main()
-
