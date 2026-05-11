@@ -1,5 +1,6 @@
 output/
 urls.yml
+target.yaml
 
 # Python
 __pycache__
