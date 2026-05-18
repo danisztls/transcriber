@@ -1,9 +1,11 @@
 """CLI entry point and scrape orchestration."""
 
 import argparse
+import asyncio
 import os
 import time
 
+import httpx
 import yaml
 
 from .assets import get_assets
@@ -12,7 +14,7 @@ from .extract import filter_html, filter_mkdown, get_html, parse_html
 from .writer import gen_path, save_file
 
 
-def scrape(url: str, cfg: Config) -> None:
+async def scrape(url: str, cfg: Config) -> None:
     """Scrape URL and save Markdown content to disk."""
     if not cfg.cli_mode:
         cfg.err.print(f"\n[purple]{url}[/purple]")
@@ -21,12 +23,12 @@ def scrape(url: str, cfg: Config) -> None:
     path = gen_path(url, cfg)
 
     try:
-        html = get_html(url, path, cfg)
+        html = await get_html(url, path, cfg)
     except Exception:
         return
 
     html_filtered = filter_html(html, path, cfg)
-    html_rewritten = get_assets(path[0], url, html_filtered, cfg)
+    html_rewritten = await get_assets(path[0], url, html_filtered, cfg)
 
     mkdown = parse_html(html_rewritten)
 
@@ -79,36 +81,53 @@ def _build_parser() -> argparse.ArgumentParser:
         help="debug mode",
         action="store_true",
     )
+    parser.add_argument(
+        "-w",
+        "--workers",
+        dest="workers",
+        type=int,
+        default=4,
+        help="max concurrent HTTP requests (default: 4)",
+    )
     return parser
+
+
+def _collect_urls(args) -> list[str]:
+    urls: list[str] = []
+    if args.target:
+        urls.extend(args.target)
+    if args.list:
+        with open(args.list, encoding="utf-8") as file:
+            listed = yaml.safe_load(file) or []
+        if not isinstance(listed, list):
+            raise ValueError("YAML list file must contain a top-level list of URLs")
+        urls.extend(u.strip() for u in listed if isinstance(u, str) and u.strip())
+    return urls
+
+
+async def _run(args) -> None:
+    timeout = httpx.Timeout(connect=5.0, read=30.0, write=30.0, pool=10.0)
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        cfg = Config(
+            client=client,
+            semaphore=asyncio.Semaphore(args.workers),
+            cli_mode=args.cli,
+            verbose_mode=args.verbose,
+            debug_mode=args.debug,
+        )
+
+        if not cfg.cli_mode:
+            cfg.err.print(":spider: scraping...")
+
+        urls = _collect_urls(args)
+        if not urls:
+            cfg.err.print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")
+            return
+
+        await asyncio.gather(*(scrape(url, cfg) for url in urls))
 
 
 def main(argv=None) -> None:
     parser = _build_parser()
     args = parser.parse_args(argv)
-
-    cfg = Config(
-        cli_mode=args.cli,
-        verbose_mode=args.verbose,
-        debug_mode=args.debug,
-    )
-
-    if not cfg.cli_mode:
-        cfg.err.print(":spider: scraping...")
-
-    if args.target:
-        for url in args.target:
-            scrape(url, cfg)
-
-    if args.list:
-        with open(args.list, encoding="utf-8") as file:
-            urls = yaml.safe_load(file) or []
-
-        if not isinstance(urls, list):
-            raise ValueError("YAML list file must contain a top-level list of URLs")
-
-        for url in urls:
-            if isinstance(url, str) and url.strip():
-                scrape(url.strip(), cfg)
-
-    if not args.target and not args.list:
-        cfg.err.print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")
+    asyncio.run(_run(args))

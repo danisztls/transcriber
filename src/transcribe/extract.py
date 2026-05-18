@@ -11,10 +11,10 @@ from .fetcher import get_response_data
 from .writer import save_file
 
 
-def get_html(url: str, path: list[str], cfg: Config) -> BeautifulSoup:
+async def get_html(url: str, path: list[str], cfg: Config) -> BeautifulSoup:
     """Fetch URL and return a best-effort content node (article/main/body)."""
     try:
-        html = BeautifulSoup(get_response_data(url, cfg), "html.parser")
+        html = BeautifulSoup(await get_response_data(url, cfg), "html.parser")
     except Exception as e:
         cfg.err.print(f"[red]ERROR:[/red] {e}")
         raise RuntimeError("Failed to Get HTML") from e

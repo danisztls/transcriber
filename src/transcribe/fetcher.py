@@ -1,13 +1,11 @@
 """HTTP fetching with UA rotation and Retry-After backoff."""
 
-import time
+import asyncio
 from urllib.parse import urlparse
 
-import urllib3
+import httpx
 
 from .config import Config
-
-_http = urllib3.PoolManager()
 
 _USER_AGENTS = [
     "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
@@ -29,14 +27,12 @@ def _parse_retry_after(value: str | None) -> float:
         return 5.0
 
 
-def get_response_data(
-    url: str,
-    cfg: Config,
-    *,
-    timeout: urllib3.Timeout = urllib3.Timeout(connect=5.0, read=30.0),
-    retries: int = 0,
-) -> bytes:
-    """Make a GET request and return the response body as bytes."""
+async def get_response_data(url: str, cfg: Config) -> bytes:
+    """Fetch URL and return the response body as bytes.
+
+    Rotates through user agents on retryable failures and honors
+    Retry-After. Concurrency is bounded by cfg.semaphore.
+    """
     if not isinstance(url, str) or not url.strip():
         raise ValueError("URL must be a non-empty string")
     url = url.strip()
@@ -48,31 +44,24 @@ def get_response_data(
     retryable_statuses = {401, 403, 429, 503}
 
     for attempt, ua in enumerate(_USER_AGENTS):
-        headers = urllib3.make_headers(user_agent=ua)
         try:
-            response = _http.request(
-                "GET",
-                url,
-                headers=headers,
-                redirect=True,
-                timeout=timeout,
-                retries=retries,
-            )
+            async with cfg.semaphore:
+                response = await cfg.client.get(url, headers={"User-Agent": ua})
 
             if cfg.debug_mode:
-                cfg.err.print(f"[gray]{url}[/gray] -> {response.status} ({ua})")
+                cfg.err.print(f"[gray]{url}[/gray] -> {response.status_code} ({ua})")
 
-            last_status = getattr(response, "status", None)
+            last_status = response.status_code
 
             if last_status == 200:
-                return response.data
+                return response.content
 
             if last_status not in retryable_statuses:
                 break
 
             retry_after = _parse_retry_after(response.headers.get("Retry-After"))
-            time.sleep(retry_after if retry_after > 0 else min(2**attempt, 30))
-        except Exception as e:
+            await asyncio.sleep(retry_after if retry_after > 0 else min(2**attempt, 30))
+        except httpx.HTTPError as e:
             last_error = e
             last_status = None
 

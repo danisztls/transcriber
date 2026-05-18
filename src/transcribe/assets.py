@@ -1,5 +1,6 @@
 """Asset extraction, download, and URL rewriting."""
 
+import asyncio
 import hashlib
 import os
 from urllib.parse import urljoin, urlparse
@@ -58,57 +59,55 @@ def _asset_filename(parsed_url) -> str:
     return f"{name}-{digest}"
 
 
-def get_assets(dir_path: str, base_url: str, html: BeautifulSoup, cfg: Config) -> BeautifulSoup:
-    """Download linked assets and rewrite element URLs to local paths."""
-    downloaded: dict[str, str] = {}
-    failed: set[str] = set()
-
-    def _download(resolved: str) -> str | None:
-        if resolved in downloaded:
-            return downloaded[resolved]
-        if resolved in failed:
-            return None
-        parsed = urlparse(resolved)
-        if parsed.scheme not in ("http", "https"):
-            failed.add(resolved)
-            return None
-        if not cfg.cli_mode:
-            cfg.err.print(f"\n[gray]{resolved}[/gray]")
-        try:
-            data = get_response_data(resolved, cfg)
-        except Exception:
-            failed.add(resolved)
-            return None
-        filename = _asset_filename(parsed)
-        save_file(os.path.join(dir_path, filename), data, cfg, overwrite=True)
-        downloaded[resolved] = filename
-        return filename
-
-    def _rewrite(el, local: str) -> None:
-        el["src"] = f"./{local}"
-        for attr in ("srcset", "data-src", "data-original"):
-            if attr in el.attrs:
-                del el.attrs[attr]
-
+def _collect_targets(base_url: str, html: BeautifulSoup) -> list[tuple]:
+    """Pair each asset element with its resolved URL."""
+    targets: list[tuple] = []
     for tag_name in ("img", "video", "audio"):
         for el in html.find_all(tag_name):
             raw = _best_asset_url(el)
-            if not raw:
-                continue
-            local = _download(urljoin(base_url, raw))
-            if local:
-                _rewrite(el, local)
-
+            if raw:
+                targets.append((el, urljoin(base_url, raw)))
     for source in html.find_all("source"):
         raw = source.get("src")
         if not raw:
             srcset = source.get("srcset")
             if srcset:
                 raw = _pick_srcset(srcset)
-        if not raw:
-            continue
-        local = _download(urljoin(base_url, raw))
+        if raw:
+            targets.append((source, urljoin(base_url, raw)))
+    return targets
+
+
+async def get_assets(
+    dir_path: str, base_url: str, html: BeautifulSoup, cfg: Config
+) -> BeautifulSoup:
+    """Download linked assets in parallel and rewrite element URLs to local paths."""
+    targets = _collect_targets(base_url, html)
+    unique_urls = list({resolved for _, resolved in targets})
+
+    async def _fetch(resolved: str) -> tuple[str, str | None]:
+        parsed = urlparse(resolved)
+        if parsed.scheme not in ("http", "https"):
+            return resolved, None
+        if not cfg.cli_mode:
+            cfg.err.print(f"[gray]{resolved}[/gray]")
+        try:
+            data = await get_response_data(resolved, cfg)
+        except Exception:
+            return resolved, None
+        filename = _asset_filename(parsed)
+        save_file(os.path.join(dir_path, filename), data, cfg, overwrite=True)
+        return resolved, filename
+
+    results = await asyncio.gather(*(_fetch(u) for u in unique_urls))
+    local_by_url: dict[str, str | None] = dict(results)
+
+    for el, resolved in targets:
+        local = local_by_url.get(resolved)
         if local:
-            _rewrite(source, local)
+            el["src"] = f"./{local}"
+            for attr in ("srcset", "data-src", "data-original"):
+                if attr in el.attrs:
+                    del el.attrs[attr]
 
     return html

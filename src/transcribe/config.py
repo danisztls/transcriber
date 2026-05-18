@@ -1,15 +1,19 @@
 """Runtime configuration threaded through the package."""
 
+import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import httpx
 from rich.console import Console
 
 
 @dataclass(frozen=True)
 class Config:
-    """Per-invocation knobs. Built once in cli.main and passed downstream."""
+    """Per-invocation knobs. Built once in cli._run inside an event loop."""
 
+    client: httpx.AsyncClient
+    semaphore: asyncio.Semaphore
     cli_mode: bool = False
     verbose_mode: bool = False
     debug_mode: bool = False
