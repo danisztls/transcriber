@@ -106,25 +106,35 @@ def get_html(url: str, path) -> BeautifulSoup:
     if DEBUG_MODE:
         save_file(os.path.join(path[0], path[1] + ".raw.html"), html.prettify(), overwrite=True)
 
-    for tag in ("article", "main", "body"):
-        content = html.find(tag)
-        if not content:
+    content = None
+    for tag in ("article", "main"):
+        nodes = html.find_all(tag)
+        if not nodes:
             continue
+        content = (
+            nodes[0]
+            if len(nodes) == 1
+            else max(nodes, key=lambda n: len(n.get_text(strip=True)))
+        )
+        break
 
-        if tag == "body":
+    if content is None:
+        content = html.find("body")
+        if content is not None:
             for t in content.find_all(("header", "footer")):
                 t.decompose()
 
-        if DEBUG_MODE:
-            save_file(
-                os.path.join(path[0], path[1] + ".content.html"),
-                content.prettify(),
-                overwrite=True,
-            )
+    if content is None:
+        return html
 
-        return content
+    if DEBUG_MODE:
+        save_file(
+            os.path.join(path[0], path[1] + ".content.html"),
+            content.prettify(),
+            overwrite=True,
+        )
 
-    return html
+    return content
 
 
 def filter_html(html: BeautifulSoup, path) -> BeautifulSoup:
