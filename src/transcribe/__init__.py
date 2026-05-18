@@ -7,6 +7,7 @@ __author__ = "Daniel Souza <me@posix.dev.br>"
 __license__ = "GPLv3"
 
 import argparse
+import hashlib
 import os
 import pathlib
 import re
@@ -209,6 +210,16 @@ def _safe_segment(s: str) -> str:
     return s or "unknown"
 
 
+def _asset_filename(parsed_url) -> str:
+    """Build a collision-resistant filename from a parsed asset URL."""
+    name = _safe_segment(os.path.basename(parsed_url.path) or "asset")
+    digest = hashlib.sha1(parsed_url.path.encode("utf-8")).hexdigest()[:8]
+    if "." in name:
+        stem, ext = name.rsplit(".", 1)
+        return f"{stem}-{digest}.{ext}"
+    return f"{name}-{digest}"
+
+
 def gen_path(url: str):
     """Generate file path from URL preserving URL subpath."""
     parsed = urlparse(url)
@@ -302,7 +313,7 @@ def get_assets(dir_path: str, base_url: str, html: BeautifulSoup) -> BeautifulSo
         except Exception:
             continue
 
-        filename = _safe_segment(os.path.basename(parsed.path) or "asset")
+        filename = _asset_filename(parsed)
         save_file(os.path.join(dir_path, filename), data, overwrite=True)
 
         # Rewrite references (match original raw AND resolved variants conservatively)
