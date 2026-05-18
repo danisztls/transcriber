@@ -8,13 +8,6 @@ from urllib.parse import unquote, urlparse
 from .config import Config
 
 
-def mkdir(path: str) -> None:
-    """Create the directory and any missing parents."""
-    if not path:
-        return
-    os.makedirs(path, exist_ok=True)
-
-
 def _safe_segment(s: str) -> str:
     s = re.sub(r"[^a-zA-Z0-9._-]+", "_", s).strip("_")
     return s or "unknown"
@@ -44,7 +37,6 @@ def gen_path(url: str, cfg: Config) -> list[str]:
 
     subdirs = [_safe_segment(s) for s in subdirs if _safe_segment(s)]
     dir_path = os.path.join(cfg.output_dir, base, *subdirs, "")
-    mkdir(dir_path)
     return [dir_path, file_seg]
 
 

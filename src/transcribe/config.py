@@ -14,8 +14,7 @@ class Config:
 
     client: httpx.AsyncClient
     semaphore: asyncio.Semaphore
-    cli_mode: bool = False
-    verbose_mode: bool = False
+    write: bool = False
     debug_mode: bool = False
     scrape: bool = False
     delay: float = 0.0

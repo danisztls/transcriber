@@ -15,9 +15,8 @@ from .writer import gen_path, save_file
 
 
 async def scrape(url: str, cfg: Config) -> None:
-    """Scrape URL and save Markdown content to disk."""
-    if not cfg.cli_mode:
-        cfg.err.print(f"\n[purple]{url}[/purple]")
+    """Scrape URL; print markdown to STDOUT, or save to disk with cfg.write/debug."""
+    cfg.err.print(f"\n[purple]{url}[/purple]")
 
     start = time.time()
     path = gen_path(url, cfg)
@@ -37,14 +36,12 @@ async def scrape(url: str, cfg: Config) -> None:
 
     mkdown_filtered = filter_mkdown(mkdown)
 
-    if cfg.debug_mode or not cfg.cli_mode:
+    if cfg.write or cfg.debug_mode:
         save_file(os.path.join(path[0], path[1] + ".md"), mkdown_filtered, cfg, overwrite=True)
-
-    if cfg.verbose_mode or cfg.cli_mode:
+    else:
         print(mkdown_filtered)
 
-    if not cfg.cli_mode:
-        cfg.err.print(f"[green]{round(time.time() - start, 2)} seconds[/green]")
+    cfg.err.print(f"[green]{round(time.time() - start, 2)} seconds[/green]")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -57,27 +54,19 @@ def _build_parser() -> argparse.ArgumentParser:
         help="URL to scrap, or path to a YAML file with a list of URLs (repeatable)",
     )
     parser.add_argument(
-        "-c",
-        "--cli-mode",
-        dest="cli",
+        "-w",
+        "--write",
+        dest="write",
         default=False,
-        help="CLI mode (only print content to STDOUT)",
         action="store_true",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        dest="verbose",
-        default=False,
-        help="verbose mode (print content to STDOUT)",
-        action="store_true",
+        help="save markdown to disk instead of printing to STDOUT",
     )
     parser.add_argument(
         "-d",
         "--debug",
         dest="debug",
         default=False,
-        help="debug mode",
+        help="debug mode (also writes intermediates to disk)",
         action="store_true",
     )
     parser.add_argument(
@@ -88,7 +77,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="download linked assets locally and rewrite references to ./filename",
     )
     parser.add_argument(
-        "-w",
+        "-j",
         "--workers",
         dest="workers",
         type=int,
@@ -125,15 +114,13 @@ async def _run(args) -> None:
         cfg = Config(
             client=client,
             semaphore=asyncio.Semaphore(args.workers),
-            cli_mode=args.cli,
-            verbose_mode=args.verbose,
+            write=args.write,
             debug_mode=args.debug,
             scrape=args.scrape,
             delay=args.delay,
         )
 
-        if not cfg.cli_mode:
-            cfg.err.print(":spider: scraping...")
+        cfg.err.print(":spider: scraping...")
 
         urls = _collect_urls(args)
         if not urls:

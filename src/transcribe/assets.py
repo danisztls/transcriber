@@ -92,8 +92,7 @@ async def get_assets(
             parsed = urlparse(resolved)
             if parsed.scheme not in ("http", "https"):
                 return resolved, None
-            if not cfg.cli_mode:
-                cfg.err.print(f"[gray]{resolved}[/gray]")
+            cfg.err.print(f"[gray]{resolved}[/gray]")
             try:
                 data = await get_response_data(resolved, cfg)
             except Exception:
