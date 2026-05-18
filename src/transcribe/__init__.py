@@ -19,10 +19,12 @@ import urllib3
 from bs4 import BeautifulSoup, Comment
 from markdownify import MarkdownConverter
 from rich import print
+from rich.console import Console
 import yaml
 
 output_path: Optional[str] = None
 _http = urllib3.PoolManager()
+_err = Console(stderr=True)
 
 
 def _get_output_dir() -> str:
@@ -96,7 +98,7 @@ def get_response_data(
 
             # Avoid noisy/always-on debug output. Use DEBUG_MODE only.
             if DEBUG_MODE:
-                print(f"[gray]{url}[/gray] -> {response.status} ({ua})")
+                _err.print(f"[gray]{url}[/gray] -> {response.status} ({ua})")
 
             last_status = getattr(response, "status", None)
 
@@ -122,7 +124,7 @@ def get_html(url: str, path) -> BeautifulSoup:
     try:
         html = BeautifulSoup(get_response_data(url), "html.parser")
     except Exception as e:
-        print(f"[red]ERROR:[/red] {e}")
+        _err.print(f"[red]ERROR:[/red] {e}")
         raise RuntimeError("Failed to Get HTML") from e
 
     if DEBUG_MODE:
@@ -306,7 +308,7 @@ def gen_path(url: str):
 def save_file(path: str, data: Any, overwrite: bool = False) -> None:
     """Save data to disk."""
     if os.path.exists(path) and not overwrite:
-        print(f"[gray]{path}[/gray] [yellow]already exists![/yellow]")
+        _err.print(f"[gray]{path}[/gray] [yellow]already exists![/yellow]")
         return
 
     parent = os.path.dirname(path)
@@ -336,7 +338,7 @@ def get_assets(dir_path: str, base_url: str, html: BeautifulSoup) -> BeautifulSo
             failed.add(resolved)
             return None
         if not CLI_MODE:
-            print(f"\n[gray]{resolved}[/gray]")
+            _err.print(f"\n[gray]{resolved}[/gray]")
         try:
             data = get_response_data(resolved)
         except Exception:
@@ -387,7 +389,7 @@ class chronometer:
             end = time.time()
 
             if not CLI_MODE:
-                print("[green]%s seconds[/green]" % str(round(end - start, 2)))
+                _err.print("[green]%s seconds[/green]" % str(round(end - start, 2)))
 
             return result
 
@@ -398,7 +400,7 @@ class chronometer:
 def scrape(url: str) -> None:
     """Scrape URL and save Markdown content to disk."""
     if not CLI_MODE:
-        print(f"\n[purple]{url}[/purple]")
+        _err.print(f"\n[purple]{url}[/purple]")
 
     path = gen_path(url)
 
@@ -472,7 +474,7 @@ def main(argv=None) -> None:
     DEBUG_MODE = args.debug
 
     if not CLI_MODE:
-        print(":spider: scraping...")
+        _err.print(":spider: scraping...")
 
     if args.target:
         for url in args.target:
@@ -490,7 +492,7 @@ def main(argv=None) -> None:
                 scrape(url.strip())
 
     if not args.target and not args.list:
-        print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")
+        _err.print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")
 
 
 if __name__ == "__main__":
