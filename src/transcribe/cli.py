@@ -89,6 +89,13 @@ def _build_parser() -> argparse.ArgumentParser:
         default=4,
         help="max concurrent HTTP requests (default: 4)",
     )
+    parser.add_argument(
+        "--delay",
+        dest="delay",
+        type=float,
+        default=0.0,
+        help="seconds each request slot waits after a response, throttling the rate (default: 0)",
+    )
     return parser
 
 
@@ -114,6 +121,7 @@ async def _run(args) -> None:
             cli_mode=args.cli,
             verbose_mode=args.verbose,
             debug_mode=args.debug,
+            delay=args.delay,
         )
 
         if not cfg.cli_mode:

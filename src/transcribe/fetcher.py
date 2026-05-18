@@ -47,6 +47,8 @@ async def get_response_data(url: str, cfg: Config) -> bytes:
         try:
             async with cfg.semaphore:
                 response = await cfg.client.get(url, headers={"User-Agent": ua})
+                if cfg.delay > 0:
+                    await asyncio.sleep(cfg.delay)
 
             if cfg.debug_mode:
                 cfg.err.print(f"[gray]{url}[/gray] -> {response.status_code} ({ua})")
