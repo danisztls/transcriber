@@ -133,7 +133,9 @@ def filter_html(html: BeautifulSoup, path) -> BeautifulSoup:
     for el in html.find_all(removable_tags):
         el.decompose()
 
-    for el in list(html.find_all(True)):
+    for el in reversed(list(html.find_all(True))):
+        if el.name is None:
+            continue
         if el.name in ("img", "video", "audio"):
             continue
 
