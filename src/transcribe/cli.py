@@ -54,9 +54,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--target",
         dest="target",
         action="append",
-        help="URL to scrap (repeatable)",
+        help="URL to scrap, or path to a YAML file with a list of URLs (repeatable)",
     )
-    parser.add_argument("-l", "--list", dest="list", help="YAML list of URLs to scrap")
     parser.add_argument(
         "-c",
         "--cli-mode",
@@ -101,13 +100,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _collect_urls(args) -> list[str]:
     urls: list[str] = []
-    if args.target:
-        urls.extend(args.target)
-    if args.list:
-        with open(args.list, encoding="utf-8") as file:
+    for target in args.target or []:
+        if target.startswith(("http://", "https://")):
+            urls.append(target)
+            continue
+        with open(target, encoding="utf-8") as file:
             listed = yaml.safe_load(file) or []
         if not isinstance(listed, list):
-            raise ValueError("YAML list file must contain a top-level list of URLs")
+            raise ValueError(f"{target}: YAML file must contain a top-level list of URLs")
         urls.extend(u.strip() for u in listed if isinstance(u, str) and u.strip())
     return urls
 
@@ -129,7 +129,9 @@ async def _run(args) -> None:
 
         urls = _collect_urls(args)
         if not urls:
-            cfg.err.print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")
+            cfg.err.print(
+                "[red]No URL to scrape. Please pass --target with a URL or YAML file.[/red]"
+            )
             return
 
         await asyncio.gather(*(scrape(url, cfg) for url in urls))

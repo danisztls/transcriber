@@ -31,9 +31,9 @@ uv run transcribe -t <URL>
 # Scrape a URL
 transcribe -t https://en.wikipedia.org/wiki/Transcription
 
-# Scrape multiple URLs (repeat -t, or use a YAML list)
+# Scrape multiple URLs (repeat -t, or point -t at a YAML list)
 transcribe -t <URL1> -t <URL2>
-transcribe -l urls.yml
+transcribe -t urls.yml
 
 # Verbose, also print content to STDOUT
 transcribe -v -t <URL>
@@ -42,15 +42,14 @@ transcribe -v -t <URL>
 transcribe -c -t <URL>
 
 # Tune concurrency and politeness
-transcribe -w 8 --delay 0.5 -l urls.yml
+transcribe -w 8 --delay 0.5 -t urls.yml
 ```
 
 ### Flags
 
 | Flag | Default | What it does |
 |---|---|---|
-| `-t`, `--target` | — | URL to scrape. Repeatable. |
-| `-l`, `--list` | — | YAML file with a top-level list of URLs. |
+| `-t`, `--target` | — | URL to scrape, or path to a YAML file with a top-level list of URLs. Repeatable. |
 | `-c`, `--cli-mode` | off | Only the markdown content goes to STDOUT; diagnostics go to STDERR. |
 | `-v`, `--verbose` | off | Print markdown content in addition to writing it to disk. |
 | `-d`, `--debug` | off | Dump intermediate `.raw.html`, `.content.html`, `.filtered.html`, `.raw.md` alongside the output. |
