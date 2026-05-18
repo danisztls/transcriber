@@ -78,7 +78,7 @@ def get_response_data(
         raise ValueError("URL must be a non-empty string")
 
     url = url.strip()
-    if not re.match(r"^https?://", url):
+    if urlparse(url).scheme not in ("http", "https"):
         raise ValueError("URL must start with http:// or https://")
 
     last_error: BaseException | None = None
