@@ -20,8 +20,16 @@ from markdownify import MarkdownConverter
 from rich import print
 import yaml
 
-output_path = str(pathlib.Path().absolute() / "output")
+output_path: Optional[str] = None
 _http = urllib3.PoolManager()
+
+
+def _get_output_dir() -> str:
+    """Resolve the output directory lazily from CWD at first use."""
+    global output_path
+    if output_path is None:
+        output_path = str(pathlib.Path.cwd() / "output")
+    return output_path
 
 # Runtime flags (set in main())
 CLI_MODE = False
@@ -213,7 +221,7 @@ def gen_path(url: str):
             subdirs = []
 
         subdirs = [_safe_segment(s) for s in subdirs if _safe_segment(s)]
-        dir_path = os.path.join(output_path, base, *subdirs, "")
+        dir_path = os.path.join(_get_output_dir(), base, *subdirs, "")
         mkdir(dir_path)
         return [dir_path, file_seg]
 
@@ -229,7 +237,7 @@ def gen_path(url: str):
     else:
         file_seg = _safe_segment(filename) or "index"
 
-    dir_path = os.path.join(output_path, base, "")
+    dir_path = os.path.join(_get_output_dir(), base, "")
     mkdir(dir_path)
     return [dir_path, file_seg]
 
