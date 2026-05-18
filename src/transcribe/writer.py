@@ -5,7 +5,7 @@ import re
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from . import _state
+from .config import Config
 
 
 def mkdir(path: str) -> None:
@@ -20,7 +20,7 @@ def _safe_segment(s: str) -> str:
     return s or "unknown"
 
 
-def gen_path(url: str):
+def gen_path(url: str, cfg: Config) -> list[str]:
     """Generate file path from URL preserving URL subpath."""
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
@@ -43,15 +43,15 @@ def gen_path(url: str):
         subdirs = []
 
     subdirs = [_safe_segment(s) for s in subdirs if _safe_segment(s)]
-    dir_path = os.path.join(_state.get_output_dir(), base, *subdirs, "")
+    dir_path = os.path.join(cfg.output_dir, base, *subdirs, "")
     mkdir(dir_path)
     return [dir_path, file_seg]
 
 
-def save_file(path: str, data: Any, overwrite: bool = False) -> None:
+def save_file(path: str, data: Any, cfg: Config, *, overwrite: bool = False) -> None:
     """Save data to disk."""
     if os.path.exists(path) and not overwrite:
-        _state.err.print(f"[gray]{path}[/gray] [yellow]already exists![/yellow]")
+        cfg.err.print(f"[gray]{path}[/gray] [yellow]already exists![/yellow]")
         return
 
     parent = os.path.dirname(path)

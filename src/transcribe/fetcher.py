@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 import urllib3
 
-from . import _state
+from .config import Config
 
 _http = urllib3.PoolManager()
 
@@ -31,6 +31,7 @@ def _parse_retry_after(value: str | None) -> float:
 
 def get_response_data(
     url: str,
+    cfg: Config,
     *,
     timeout: urllib3.Timeout = urllib3.Timeout(connect=5.0, read=30.0),
     retries: int = 0,
@@ -58,8 +59,8 @@ def get_response_data(
                 retries=retries,
             )
 
-            if _state.DEBUG_MODE:
-                _state.err.print(f"[gray]{url}[/gray] -> {response.status} ({ua})")
+            if cfg.debug_mode:
+                cfg.err.print(f"[gray]{url}[/gray] -> {response.status} ({ua})")
 
             last_status = getattr(response, "status", None)
 

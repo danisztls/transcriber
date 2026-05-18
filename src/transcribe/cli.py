@@ -5,58 +5,44 @@ import os
 import time
 
 import yaml
-from rich import print
 
-from . import _state
 from .assets import get_assets
+from .config import Config
 from .extract import filter_html, filter_mkdown, get_html, parse_html
 from .writer import gen_path, save_file
 
 
-def chronometer(func):
-    """Measure and report the execution time of a function."""
-
-    def wrapper(*args, **kwargs):
-        start = time.time()
-        result = func(*args, **kwargs)
-        end = time.time()
-
-        if not _state.CLI_MODE:
-            _state.err.print(f"[green]{round(end - start, 2)} seconds[/green]")
-
-        return result
-
-    return wrapper
-
-
-@chronometer
-def scrape(url: str) -> None:
+def scrape(url: str, cfg: Config) -> None:
     """Scrape URL and save Markdown content to disk."""
-    if not _state.CLI_MODE:
-        _state.err.print(f"\n[purple]{url}[/purple]")
+    if not cfg.cli_mode:
+        cfg.err.print(f"\n[purple]{url}[/purple]")
 
-    path = gen_path(url)
+    start = time.time()
+    path = gen_path(url, cfg)
 
     try:
-        html = get_html(url, path)
+        html = get_html(url, path, cfg)
     except Exception:
         return
 
-    html_filtered = filter_html(html, path)
-    html_rewritten = get_assets(path[0], url, html_filtered)
+    html_filtered = filter_html(html, path, cfg)
+    html_rewritten = get_assets(path[0], url, html_filtered, cfg)
 
     mkdown = parse_html(html_rewritten)
 
-    if _state.DEBUG_MODE:
-        save_file(os.path.join(path[0], path[1] + ".raw.md"), mkdown, overwrite=True)
+    if cfg.debug_mode:
+        save_file(os.path.join(path[0], path[1] + ".raw.md"), mkdown, cfg, overwrite=True)
 
     mkdown_filtered = filter_mkdown(mkdown)
 
-    if _state.DEBUG_MODE or not _state.CLI_MODE:
-        save_file(os.path.join(path[0], path[1] + ".md"), mkdown_filtered, overwrite=True)
+    if cfg.debug_mode or not cfg.cli_mode:
+        save_file(os.path.join(path[0], path[1] + ".md"), mkdown_filtered, cfg, overwrite=True)
 
-    if _state.VERBOSE_MODE or _state.CLI_MODE:
+    if cfg.verbose_mode or cfg.cli_mode:
         print(mkdown_filtered)
+
+    if not cfg.cli_mode:
+        cfg.err.print(f"[green]{round(time.time() - start, 2)} seconds[/green]")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -100,16 +86,18 @@ def main(argv=None) -> None:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    _state.CLI_MODE = args.cli
-    _state.VERBOSE_MODE = args.verbose
-    _state.DEBUG_MODE = args.debug
+    cfg = Config(
+        cli_mode=args.cli,
+        verbose_mode=args.verbose,
+        debug_mode=args.debug,
+    )
 
-    if not _state.CLI_MODE:
-        _state.err.print(":spider: scraping...")
+    if not cfg.cli_mode:
+        cfg.err.print(":spider: scraping...")
 
     if args.target:
         for url in args.target:
-            scrape(url)
+            scrape(url, cfg)
 
     if args.list:
         with open(args.list, encoding="utf-8") as file:
@@ -120,7 +108,7 @@ def main(argv=None) -> None:
 
         for url in urls:
             if isinstance(url, str) and url.strip():
-                scrape(url.strip())
+                scrape(url.strip(), cfg)
 
     if not args.target and not args.list:
-        _state.err.print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")
+        cfg.err.print("[red]No URL to scrape. Please input an URL or Yaml list.[/red]")

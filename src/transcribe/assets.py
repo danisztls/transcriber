@@ -6,7 +6,7 @@ from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
-from . import _state
+from .config import Config
 from .fetcher import get_response_data
 from .writer import _safe_segment, save_file
 
@@ -58,7 +58,7 @@ def _asset_filename(parsed_url) -> str:
     return f"{name}-{digest}"
 
 
-def get_assets(dir_path: str, base_url: str, html: BeautifulSoup) -> BeautifulSoup:
+def get_assets(dir_path: str, base_url: str, html: BeautifulSoup, cfg: Config) -> BeautifulSoup:
     """Download linked assets and rewrite element URLs to local paths."""
     downloaded: dict[str, str] = {}
     failed: set[str] = set()
@@ -72,15 +72,15 @@ def get_assets(dir_path: str, base_url: str, html: BeautifulSoup) -> BeautifulSo
         if parsed.scheme not in ("http", "https"):
             failed.add(resolved)
             return None
-        if not _state.CLI_MODE:
-            _state.err.print(f"\n[gray]{resolved}[/gray]")
+        if not cfg.cli_mode:
+            cfg.err.print(f"\n[gray]{resolved}[/gray]")
         try:
-            data = get_response_data(resolved)
+            data = get_response_data(resolved, cfg)
         except Exception:
             failed.add(resolved)
             return None
         filename = _asset_filename(parsed)
-        save_file(os.path.join(dir_path, filename), data, overwrite=True)
+        save_file(os.path.join(dir_path, filename), data, cfg, overwrite=True)
         downloaded[resolved] = filename
         return filename
 

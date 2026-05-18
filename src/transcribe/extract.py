@@ -6,21 +6,26 @@ import re
 from bs4 import BeautifulSoup, Comment
 from markdownify import MarkdownConverter
 
-from . import _state
+from .config import Config
 from .fetcher import get_response_data
 from .writer import save_file
 
 
-def get_html(url: str, path) -> BeautifulSoup:
+def get_html(url: str, path: list[str], cfg: Config) -> BeautifulSoup:
     """Fetch URL and return a best-effort content node (article/main/body)."""
     try:
-        html = BeautifulSoup(get_response_data(url), "html.parser")
+        html = BeautifulSoup(get_response_data(url, cfg), "html.parser")
     except Exception as e:
-        _state.err.print(f"[red]ERROR:[/red] {e}")
+        cfg.err.print(f"[red]ERROR:[/red] {e}")
         raise RuntimeError("Failed to Get HTML") from e
 
-    if _state.DEBUG_MODE:
-        save_file(os.path.join(path[0], path[1] + ".raw.html"), html.prettify(), overwrite=True)
+    if cfg.debug_mode:
+        save_file(
+            os.path.join(path[0], path[1] + ".raw.html"),
+            html.prettify(),
+            cfg,
+            overwrite=True,
+        )
 
     content = None
     for tag in ("article", "main"):
@@ -41,17 +46,18 @@ def get_html(url: str, path) -> BeautifulSoup:
     if content is None:
         return html
 
-    if _state.DEBUG_MODE:
+    if cfg.debug_mode:
         save_file(
             os.path.join(path[0], path[1] + ".content.html"),
             content.prettify(),
+            cfg,
             overwrite=True,
         )
 
     return content
 
 
-def filter_html(html: BeautifulSoup, path) -> BeautifulSoup:
+def filter_html(html: BeautifulSoup, path: list[str], cfg: Config) -> BeautifulSoup:
     """Filter HTML to remove non-content."""
     removable_tags = ("style", "script", "iframe", "nav", "svg", "button")
     for el in html.find_all(removable_tags):
@@ -68,10 +74,11 @@ def filter_html(html: BeautifulSoup, path) -> BeautifulSoup:
     for comment in html.find_all(string=lambda text: isinstance(text, Comment)):
         comment.extract()
 
-    if _state.DEBUG_MODE:
+    if cfg.debug_mode:
         save_file(
             os.path.join(path[0], path[1] + ".filtered.html"),
             html.prettify(),
+            cfg,
             overwrite=True,
         )
 
