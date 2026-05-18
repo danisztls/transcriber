@@ -262,44 +262,27 @@ def gen_path(url: str):
     """Generate file path from URL preserving URL subpath."""
     parsed = urlparse(url)
 
-    if parsed.scheme not in ("http", "https", "file"):
+    if parsed.scheme not in ("http", "https"):
         raise ValueError("Invalid URL")
 
-    if parsed.scheme in ("http", "https"):
-        base = _safe_segment(parsed.netloc or "unknown")
-        url_path = unquote(parsed.path or "/")
+    base = _safe_segment(parsed.netloc or "unknown")
+    url_path = unquote(parsed.path or "/")
 
-        segments = [seg for seg in url_path.split("/") if seg]
-        if segments:
-            last = segments[-1]
-            if "." in last:
-                file_seg = _safe_segment(last.rsplit(".", 1)[0]) or "index"
-                subdirs = segments[:-1]
-            else:
-                file_seg = "index"
-                subdirs = segments
+    segments = [seg for seg in url_path.split("/") if seg]
+    if segments:
+        last = segments[-1]
+        if "." in last:
+            file_seg = _safe_segment(last.rsplit(".", 1)[0]) or "index"
+            subdirs = segments[:-1]
         else:
             file_seg = "index"
-            subdirs = []
-
-        subdirs = [_safe_segment(s) for s in subdirs if _safe_segment(s)]
-        dir_path = os.path.join(_get_output_dir(), base, *subdirs, "")
-        mkdir(dir_path)
-        return [dir_path, file_seg]
-
-    local_path = unquote(parsed.path or "")
-    local_path = os.path.normpath(local_path)
-
-    parent_dir = os.path.basename(os.path.dirname(local_path)) or "unknown"
-    base = os.path.join("local", _safe_segment(parent_dir))
-
-    filename = os.path.basename(local_path) or "index"
-    if "." in filename:
-        file_seg = _safe_segment(filename.rsplit(".", 1)[0]) or "index"
+            subdirs = segments
     else:
-        file_seg = _safe_segment(filename) or "index"
+        file_seg = "index"
+        subdirs = []
 
-    dir_path = os.path.join(_get_output_dir(), base, "")
+    subdirs = [_safe_segment(s) for s in subdirs if _safe_segment(s)]
+    dir_path = os.path.join(_get_output_dir(), base, *subdirs, "")
     mkdir(dir_path)
     return [dir_path, file_seg]
 
