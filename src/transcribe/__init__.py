@@ -31,6 +31,16 @@ def _get_output_dir() -> str:
         output_path = str(pathlib.Path.cwd() / "output")
     return output_path
 
+
+def _parse_retry_after(value: Optional[str]) -> float:
+    """Parse a Retry-After header value into seconds, capped to keep retries bounded."""
+    if not value:
+        return 0.0
+    try:
+        return min(max(float(value), 0.0), 60.0)
+    except ValueError:
+        return 5.0
+
 # Runtime flags (set in main())
 CLI_MODE = False
 VERBOSE_MODE = False
@@ -71,7 +81,7 @@ def get_response_data(
     last_status: Optional[int] = None
     retryable_statuses = {401, 403, 429, 503}
 
-    for ua in user_agents:
+    for attempt, ua in enumerate(user_agents):
         headers = urllib3.make_headers(user_agent=ua)
         try:
             response = _http.request(
@@ -94,6 +104,9 @@ def get_response_data(
 
             if last_status not in retryable_statuses:
                 break
+
+            retry_after = _parse_retry_after(response.headers.get("Retry-After"))
+            time.sleep(retry_after if retry_after > 0 else min(2 ** attempt, 30))
         except Exception as e:
             last_error = e
             last_status = None
