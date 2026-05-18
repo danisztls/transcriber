@@ -31,12 +31,28 @@ uv run transcribe -t <URL>
 # Scrape a URL
 transcribe -t https://en.wikipedia.org/wiki/Transcription
 
-# Scrape a list of URLS
+# Scrape multiple URLs (repeat -t, or use a YAML list)
+transcribe -t <URL1> -t <URL2>
 transcribe -l urls.yml
 
-# Verbose, print content to STDOUT
+# Verbose, also print content to STDOUT
 transcribe -v -t <URL>
 
-# CLI mode, only print content to STDOUT
+# CLI mode, only print content to STDOUT (diagnostics go to STDERR)
 transcribe -c -t <URL>
+
+# Tune concurrency and politeness
+transcribe -w 8 --delay 0.5 -l urls.yml
 ```
+
+### Flags
+
+| Flag | Default | What it does |
+|---|---|---|
+| `-t`, `--target` | — | URL to scrape. Repeatable. |
+| `-l`, `--list` | — | YAML file with a top-level list of URLs. |
+| `-c`, `--cli-mode` | off | Only the markdown content goes to STDOUT; diagnostics go to STDERR. |
+| `-v`, `--verbose` | off | Print markdown content in addition to writing it to disk. |
+| `-d`, `--debug` | off | Dump intermediate `.raw.html`, `.content.html`, `.filtered.html`, `.raw.md` alongside the output. |
+| `-w`, `--workers` | 4 | Max concurrent HTTP requests (pages + assets share the same pool). |
+| `--delay` | 0 | Seconds each request slot waits after a response. Combined with `--workers` this caps the rate at workers/delay requests per second. |
