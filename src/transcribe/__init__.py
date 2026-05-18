@@ -378,24 +378,23 @@ def get_assets(dir_path: str, base_url: str, html: BeautifulSoup) -> BeautifulSo
     return html
 
 
-class chronometer:
-    """Measure execution time of function."""
+def chronometer(func):
+    """Measure and report the execution time of a function."""
 
-    def __call__(self, func):
-        def wrapper(*args, **kwargs):
-            start = time.time()
-            result = func(*args, **kwargs)
-            end = time.time()
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
 
-            if not CLI_MODE:
-                _err.print(f"[green]{round(end - start, 2)} seconds[/green]")
+        if not CLI_MODE:
+            _err.print(f"[green]{round(end - start, 2)} seconds[/green]")
 
-            return result
+        return result
 
-        return wrapper
+    return wrapper
 
 
-@chronometer()
+@chronometer
 def scrape(url: str) -> None:
     """Scrape URL and save Markdown content to disk."""
     if not CLI_MODE:
