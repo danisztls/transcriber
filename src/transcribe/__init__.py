@@ -12,17 +12,17 @@ import os
 import pathlib
 import re
 import time
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import unquote, urljoin, urlparse
 
 import urllib3
+import yaml
 from bs4 import BeautifulSoup, Comment
 from markdownify import MarkdownConverter
 from rich import print
 from rich.console import Console
-import yaml
 
-output_path: Optional[str] = None
+output_path: str | None = None
 _http = urllib3.PoolManager()
 _err = Console(stderr=True)
 
@@ -35,7 +35,7 @@ def _get_output_dir() -> str:
     return output_path
 
 
-def _parse_retry_after(value: Optional[str]) -> float:
+def _parse_retry_after(value: str | None) -> float:
     """Parse a Retry-After header value into seconds, capped to keep retries bounded."""
     if not value:
         return 0.0
@@ -43,6 +43,7 @@ def _parse_retry_after(value: Optional[str]) -> float:
         return min(max(float(value), 0.0), 60.0)
     except ValueError:
         return 5.0
+
 
 # Runtime flags (set in main())
 CLI_MODE = False
@@ -80,8 +81,8 @@ def get_response_data(
     if not re.match(r"^https?://", url):
         raise ValueError("URL must start with http:// or https://")
 
-    last_error: Optional[BaseException] = None
-    last_status: Optional[int] = None
+    last_error: BaseException | None = None
+    last_status: int | None = None
     retryable_statuses = {401, 403, 429, 503}
 
     for attempt, ua in enumerate(user_agents):
@@ -109,7 +110,7 @@ def get_response_data(
                 break
 
             retry_after = _parse_retry_after(response.headers.get("Retry-After"))
-            time.sleep(retry_after if retry_after > 0 else min(2 ** attempt, 30))
+            time.sleep(retry_after if retry_after > 0 else min(2**attempt, 30))
         except Exception as e:
             last_error = e
             last_status = None
@@ -136,9 +137,7 @@ def get_html(url: str, path) -> BeautifulSoup:
         if not nodes:
             continue
         content = (
-            nodes[0]
-            if len(nodes) == 1
-            else max(nodes, key=lambda n: len(n.get_text(strip=True)))
+            nodes[0] if len(nodes) == 1 else max(nodes, key=lambda n: len(n.get_text(strip=True)))
         )
         break
 
@@ -212,9 +211,9 @@ def _safe_segment(s: str) -> str:
     return s or "unknown"
 
 
-def _pick_srcset(srcset: str) -> Optional[str]:
+def _pick_srcset(srcset: str) -> str | None:
     """Pick the largest candidate URL from a srcset attribute."""
-    best_url: Optional[str] = None
+    best_url: str | None = None
     best_score = -1.0
     for part in srcset.split(","):
         bits = part.strip().split()
@@ -237,7 +236,7 @@ def _pick_srcset(srcset: str) -> Optional[str]:
     return best_url
 
 
-def _best_asset_url(el) -> Optional[str]:
+def _best_asset_url(el) -> str | None:
     """Pick the best asset URL from an element: src, data-src*, then srcset."""
     for attr in ("src", "data-src", "data-original"):
         val = el.get(attr)
@@ -328,7 +327,7 @@ def get_assets(dir_path: str, base_url: str, html: BeautifulSoup) -> BeautifulSo
     downloaded: dict[str, str] = {}
     failed: set[str] = set()
 
-    def _download(resolved: str) -> Optional[str]:
+    def _download(resolved: str) -> str | None:
         if resolved in downloaded:
             return downloaded[resolved]
         if resolved in failed:
@@ -389,7 +388,7 @@ class chronometer:
             end = time.time()
 
             if not CLI_MODE:
-                _err.print("[green]%s seconds[/green]" % str(round(end - start, 2)))
+                _err.print(f"[green]{round(end - start, 2)} seconds[/green]")
 
             return result
 
@@ -481,7 +480,7 @@ def main(argv=None) -> None:
             scrape(url)
 
     if args.list:
-        with open(args.list, "r", encoding="utf-8") as file:
+        with open(args.list, encoding="utf-8") as file:
             urls = yaml.safe_load(file) or []
 
         if not isinstance(urls, list):
