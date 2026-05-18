@@ -12,7 +12,18 @@ Scrape Web content into markdown.
 
 ## Install
 
-`pipx install git+https://github.com/danisztls/transcriber`
+```sh
+uv tool install git+https://github.com/danisztls/transcriber
+```
+
+Or run from a clone without installing:
+
+```sh
+git clone https://github.com/danisztls/transcriber
+cd transcriber
+uv sync
+uv run transcribe -t <URL>
+```
 
 ## Usage
 
@@ -29,7 +40,3 @@ transcribe -v -t <URL>
 # CLI mode, only print content to STDOUT
 transcribe -c -t <URL>
 ```
-
-## See also
-
-- [autoscraper](https://github.com/alirezamika/autoscraper)
