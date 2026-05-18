@@ -41,6 +41,9 @@ transcribe -v -t <URL>
 # CLI mode, only print content to STDOUT (diagnostics go to STDERR)
 transcribe -c -t <URL>
 
+# Also download images/videos/audio locally and rewrite refs to ./filename
+transcribe --scrape -t <URL>
+
 # Tune concurrency and politeness
 transcribe -w 8 --delay 0.5 -t urls.yml
 ```
@@ -53,5 +56,6 @@ transcribe -w 8 --delay 0.5 -t urls.yml
 | `-c`, `--cli-mode` | off | Only the markdown content goes to STDOUT; diagnostics go to STDERR. |
 | `-v`, `--verbose` | off | Print markdown content in addition to writing it to disk. |
 | `-d`, `--debug` | off | Dump intermediate `.raw.html`, `.content.html`, `.filtered.html`, `.raw.md` alongside the output. |
+| `--scrape` | off | Download linked images/videos/audio next to the markdown and rewrite refs to `./filename`. Without it, refs stay as absolute original URLs. |
 | `-w`, `--workers` | 4 | Max concurrent HTTP requests (pages + assets share the same pool). |
 | `--delay` | 0 | Seconds each request slot waits after a response. Combined with `--workers` this caps the rate at workers/delay requests per second. |

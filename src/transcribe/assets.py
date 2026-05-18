@@ -81,31 +81,36 @@ def _collect_targets(base_url: str, html: BeautifulSoup) -> list[tuple]:
 async def get_assets(
     dir_path: str, base_url: str, html: BeautifulSoup, cfg: Config
 ) -> BeautifulSoup:
-    """Download linked assets in parallel and rewrite element URLs to local paths."""
+    """Resolve asset URLs; with cfg.scrape also download them and rewrite to local paths."""
     targets = _collect_targets(base_url, html)
-    unique_urls = list({resolved for _, resolved in targets})
 
-    async def _fetch(resolved: str) -> tuple[str, str | None]:
-        parsed = urlparse(resolved)
-        if parsed.scheme not in ("http", "https"):
-            return resolved, None
-        if not cfg.cli_mode:
-            cfg.err.print(f"[gray]{resolved}[/gray]")
-        try:
-            data = await get_response_data(resolved, cfg)
-        except Exception:
-            return resolved, None
-        filename = _asset_filename(parsed)
-        save_file(os.path.join(dir_path, filename), data, cfg, overwrite=True)
-        return resolved, filename
+    src_by_url: dict[str, str | None]
+    if cfg.scrape:
+        unique_urls = list({resolved for _, resolved in targets})
 
-    results = await asyncio.gather(*(_fetch(u) for u in unique_urls))
-    local_by_url: dict[str, str | None] = dict(results)
+        async def _fetch(resolved: str) -> tuple[str, str | None]:
+            parsed = urlparse(resolved)
+            if parsed.scheme not in ("http", "https"):
+                return resolved, None
+            if not cfg.cli_mode:
+                cfg.err.print(f"[gray]{resolved}[/gray]")
+            try:
+                data = await get_response_data(resolved, cfg)
+            except Exception:
+                return resolved, None
+            filename = _asset_filename(parsed)
+            save_file(os.path.join(dir_path, filename), data, cfg, overwrite=True)
+            return resolved, f"./{filename}"
+
+        results = await asyncio.gather(*(_fetch(u) for u in unique_urls))
+        src_by_url = dict(results)
+    else:
+        src_by_url = {resolved: resolved for _, resolved in targets}
 
     for el, resolved in targets:
-        local = local_by_url.get(resolved)
-        if local:
-            el["src"] = f"./{local}"
+        new_src = src_by_url.get(resolved)
+        if new_src:
+            el["src"] = new_src
             for attr in ("srcset", "data-src", "data-original"):
                 if attr in el.attrs:
                     del el.attrs[attr]

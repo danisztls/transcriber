@@ -81,6 +81,13 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
     )
     parser.add_argument(
+        "--scrape",
+        dest="scrape",
+        default=False,
+        action="store_true",
+        help="download linked assets locally and rewrite references to ./filename",
+    )
+    parser.add_argument(
         "-w",
         "--workers",
         dest="workers",
@@ -121,6 +128,7 @@ async def _run(args) -> None:
             cli_mode=args.cli,
             verbose_mode=args.verbose,
             debug_mode=args.debug,
+            scrape=args.scrape,
             delay=args.delay,
         )
 

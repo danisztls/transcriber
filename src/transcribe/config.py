@@ -17,6 +17,7 @@ class Config:
     cli_mode: bool = False
     verbose_mode: bool = False
     debug_mode: bool = False
+    scrape: bool = False
     delay: float = 0.0
     output_dir: str = field(default_factory=lambda: str(Path.cwd() / "output"))
     err: Console = field(default_factory=lambda: Console(stderr=True))
