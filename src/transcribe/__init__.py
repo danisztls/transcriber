@@ -210,6 +210,43 @@ def _safe_segment(s: str) -> str:
     return s or "unknown"
 
 
+def _pick_srcset(srcset: str) -> Optional[str]:
+    """Pick the largest candidate URL from a srcset attribute."""
+    best_url: Optional[str] = None
+    best_score = -1.0
+    for part in srcset.split(","):
+        bits = part.strip().split()
+        if not bits:
+            continue
+        url = bits[0]
+        score = 1.0
+        if len(bits) > 1:
+            descriptor = bits[1]
+            try:
+                if descriptor.endswith("w"):
+                    score = float(descriptor[:-1])
+                elif descriptor.endswith("x"):
+                    score = float(descriptor[:-1]) * 1000
+            except ValueError:
+                pass
+        if score > best_score:
+            best_score = score
+            best_url = url
+    return best_url
+
+
+def _best_asset_url(el) -> Optional[str]:
+    """Pick the best asset URL from an element: src, data-src*, then srcset."""
+    for attr in ("src", "data-src", "data-original"):
+        val = el.get(attr)
+        if val:
+            return val
+    srcset = el.get("srcset")
+    if srcset:
+        return _pick_srcset(srcset)
+    return None
+
+
 def _asset_filename(parsed_url) -> str:
     """Build a collision-resistant filename from a parsed asset URL."""
     name = _safe_segment(os.path.basename(parsed_url.path) or "asset")
@@ -285,43 +322,57 @@ def save_file(path: str, data: Any, overwrite: bool = False) -> None:
 
 
 def get_assets(dir_path: str, base_url: str, html: BeautifulSoup) -> BeautifulSoup:
-    """Download linked assets and rewrite their URLs on BeautifulSoup object with their output paths."""
-    urls: list[str] = []
-    for tag in ("img", "video", "audio"):
-        for el in html.find_all(tag):
-            src = el.get("src")
-            if src:
-                urls.append(src)
+    """Download linked assets and rewrite element URLs to local paths."""
+    downloaded: dict[str, str] = {}
+    failed: set[str] = set()
 
-    seen: set[str] = set()
-    for raw in urls:
-        if raw in seen:
-            continue
-        seen.add(raw)
-
-        # Resolve relative URLs against the page URL
-        resolved = urljoin(base_url, raw)
+    def _download(resolved: str) -> Optional[str]:
+        if resolved in downloaded:
+            return downloaded[resolved]
+        if resolved in failed:
+            return None
         parsed = urlparse(resolved)
         if parsed.scheme not in ("http", "https"):
-            continue
-
+            failed.add(resolved)
+            return None
         if not CLI_MODE:
             print(f"\n[gray]{resolved}[/gray]")
-
         try:
             data = get_response_data(resolved)
         except Exception:
-            continue
-
+            failed.add(resolved)
+            return None
         filename = _asset_filename(parsed)
         save_file(os.path.join(dir_path, filename), data, overwrite=True)
+        downloaded[resolved] = filename
+        return filename
 
-        # Rewrite references (match original raw AND resolved variants conservatively)
-        for tag in ("img", "video", "audio"):
-            for el in html.find_all(tag):
-                src = el.get("src")
-                if src == raw:
-                    el["src"] = f"./{filename}"
+    def _rewrite(el, local: str) -> None:
+        el["src"] = f"./{local}"
+        for attr in ("srcset", "data-src", "data-original"):
+            if attr in el.attrs:
+                del el.attrs[attr]
+
+    for tag_name in ("img", "video", "audio"):
+        for el in html.find_all(tag_name):
+            raw = _best_asset_url(el)
+            if not raw:
+                continue
+            local = _download(urljoin(base_url, raw))
+            if local:
+                _rewrite(el, local)
+
+    for source in html.find_all("source"):
+        raw = source.get("src")
+        if not raw:
+            srcset = source.get("srcset")
+            if srcset:
+                raw = _pick_srcset(srcset)
+        if not raw:
+            continue
+        local = _download(urljoin(base_url, raw))
+        if local:
+            _rewrite(source, local)
 
     return html
 
