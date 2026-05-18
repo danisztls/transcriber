@@ -343,7 +343,13 @@ def scrape(url: str) -> None:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--target", dest="target", help="URL to scrap")
+    parser.add_argument(
+        "-t",
+        "--target",
+        dest="target",
+        action="append",
+        help="URL to scrap (repeatable)",
+    )
     parser.add_argument("-l", "--list", dest="list", help="YAML list of URLs to scrap")
     parser.add_argument(
         "-c",
@@ -386,7 +392,8 @@ def main(argv=None) -> None:
         print(":spider: scraping...")
 
     if args.target:
-        scrape(args.target)
+        for url in args.target:
+            scrape(url)
 
     if args.list:
         with open(args.list, "r", encoding="utf-8") as file:
