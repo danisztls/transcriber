@@ -4,3 +4,4 @@ target.yaml
 
 # Python
 __pycache__
+.venv/
